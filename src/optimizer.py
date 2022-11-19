@@ -8,14 +8,25 @@ import g2o
 class Map:
     """Class to store all current frames, points, etc."""
     def __init__(self):
-        self.keyframes = []
+        self.frames = []
         self.points = []
+        self.frame_idx = self.pt_idx = 0
 
-    def add_keyframe(self):
-        pass
+    def add_frame(self, frame):
+        # TODO assumes no frame removal in ID assignment
+        assert (type(frame) == Frame)
+        ret = self.frame_idx
+        self.frame_idx += 1
+        self.frames.append(frame)
+        return ret
 
-    def add_point(self):
-        pass
+    def add_point(self, pt):
+        # TODO assumes no point removal in ID assignment
+        assert (type(pt) == Point)
+        ret = self.pt_idx
+        self.pt_idx += 1
+        self.points.append(pt)
+        return ret
 
 
     def optimize(self):

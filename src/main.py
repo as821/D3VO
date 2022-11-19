@@ -16,14 +16,23 @@ def offline_slam(cap):
 	i = 0
 	while cap.isOpened():
 		ret, frame = cap.read()
-		frame = cv2.resize(frame, (W, H))
-
-		print("\n*** frame %d/%d ***" % (i, CNT))
 		if ret == True:
+			frame = cv2.resize(frame, (W, H))
+			print("\n*** frame %d/%d ***" % (i, CNT))
 			d3vo.process_frame(frame)
+
+			# debug
+			for pt in d3vo.mp.frames[-1].kpus:
+				cv2.circle(frame, [int(i) for i in pt], color=(0, 255, 0), radius=3)
+
 		else:
 			break
 		i += 1
+
+		if DEBUG:
+			cv2.imshow('d3vo', frame)
+			if cv2.waitKey(1) == 27:     # Stop if ESC is pressed
+				break
 
 
 if __name__ == "__main__":
@@ -40,7 +49,8 @@ if __name__ == "__main__":
 	CNT = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
 	# allow use of environment variable settings for focal length, seeking
-	F = float(os.getenv("F", default="525"))
+	F = float(os.getenv("F", default="984"))
+	DEBUG = bool(os.getenv("D", default="True"))
 	if os.getenv("SEEK") is not None:
 		cap.set(cv2.CAP_PROP_POS_FRAMES, int(os.getenv("SEEK")))
 
@@ -52,7 +62,7 @@ if __name__ == "__main__":
 		W = 1024
 	print("using camera %dx%d with F %f" % (W,H,F))
 
-	offline_slam(cap, F, H, W)
+	offline_slam(cap)
 
 
 
