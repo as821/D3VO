@@ -1,4 +1,4 @@
-
+import numpy as np
 
 
 def project(pt, intrinsic):
@@ -10,7 +10,8 @@ def project(pt, intrinsic):
 
     us = fx * pt.x / pt.z + cx
     vs = fy * pt.y / pt.z + cy
-    return us, vs
+    return np.array(us, vs)
+    
 
 
 def unproject(pt, depth, intrinsic):
@@ -19,7 +20,7 @@ def unproject(pt, depth, intrinsic):
     fy = intrinsic[1, 1]
     cx = intrinsic[0, 2]
     cy = intrinsic[1, 2]
-    xs = (pt.x - cx) / fx * depth
-    ys = (pt.y - cy) / fy * depth
-    return xs, ys
+    xs = (pt[0] - cx) / fx * depth
+    ys = (pt[1] - cy) / fy * depth
+    return np.array([xs, ys, depth])
 
