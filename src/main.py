@@ -21,9 +21,10 @@ def offline_slam(cap):
 			print("\n*** frame %d/%d ***" % (i, CNT))
 			d3vo.process_frame(frame)
 
-			# debug
-			for pt in d3vo.mp.frames[-1].kpus:
-				cv2.circle(frame, [int(i) for i in pt], color=(0, 255, 0), radius=3)
+			if DEBUG:
+				# show extracted keypoints --> TODO convert to showing the matches keypoints instead
+				for pt in d3vo.mp.frames[-1].kps:
+					cv2.circle(frame, [int(i) for i in pt], color=(0, 255, 0), radius=3)
 
 		else:
 			break
