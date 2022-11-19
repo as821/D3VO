@@ -22,9 +22,22 @@ def offline_slam(cap):
 			d3vo.process_frame(frame)
 
 			if DEBUG:
-				# show extracted keypoints --> TODO convert to showing the matches keypoints instead
-				for pt in d3vo.mp.frames[-1].kps:
+				# show keypoints with matches in this frame
+				n_match = 0		# avg. number of matches of keypoints in the current frame
+				for idx in d3vo.mp.frames[-1].pts:
+					# green for keypoint in this frame
+					pt = d3vo.mp.frames[-1].kps[idx]
 					cv2.circle(frame, [int(i) for i in pt], color=(0, 255, 0), radius=3)
+
+					# red line to connect current keypoint with Point location in other frames
+					for f, f_idx in zip(d3vo.mp.frames[-1].pts[idx].frames, d3vo.mp.frames[-1].pts[idx].idxs):
+						f_pt = f.kps[f_idx]
+						cv2.line(frame, [int(i) for i in pt], [int(i) for i in f_pt], (0, 0, 255), thickness=2)
+					n_match += len(d3vo.mp.frames[-1].pts[idx].frames)
+				if len(d3vo.mp.frames[-1].pts) > 0:
+					n_match /= len(d3vo.mp.frames[-1].pts)
+
+				print("Matches: %d / %d (%f)" % (len(d3vo.mp.frames[-1].pts), len(d3vo.mp.frames[-1].kps), n_match))
 
 		else:
 			break

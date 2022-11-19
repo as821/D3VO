@@ -13,7 +13,7 @@ class D3VO:
             return
 
         # Run backend optimization
-        #self.mp.optimize()
+        self.mp.optimize()
 
 
     def frontend(self, frame):
