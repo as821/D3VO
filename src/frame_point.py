@@ -1,30 +1,31 @@
 import numpy as np
-
+from frontend import extract_features
 
 
 
 
 class Point:
     # A point is a 3D location in global coordinate system, observed by multiple frames
-    def __init__(self):
+    def __init__(self, pid):
         self.frames = []        # set of keyframes where this point is visible
-        self.id = -1            # TODO make me unique
+        self.id = pid
 
 
 
 class Frame:
-    def __init__(self, image, depth, uncertainty, pose, brightness_params):
-        # DepthNet and PoseNet outputs
+    def __init__(self, map, image, depth, uncertainty, pose, brightness_params):
         self.depth_map = depth
         self.uncertainty = uncertainty
         self.brightness_params = brightness_params
         self.pose = pose
 
-        # Additional frame metadata
         self.image = image
-        self.pts = []           # set of points visible in this keyframe
-        self.id = -1            # TODO make me unique
+        # self.pts = []                   
+        self.id = map.add_frame(self)       # get an ID from the map
 
+        # Run frontend keypoint extractor
+        self.kpus, self.des = extract_features(image)
+        self.pts = [None]*len(self.kpus)    # set of points visible in this keyframe
 
 
     def calc_optimizer_weight(self, pt, alpha=0.5):
