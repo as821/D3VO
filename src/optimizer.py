@@ -1,4 +1,4 @@
-from frame_point import Point, Frame
+from frontend import Point, Frame
 from helper import project, unproject
 
 import g2o
@@ -27,7 +27,6 @@ class Map:
         self.pt_idx += 1
         self.points.append(pt)
         return ret
-
 
     def optimize(self):
         # Set up frames as vertices
