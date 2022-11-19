@@ -49,7 +49,7 @@ class Point:
         self.id = map.add_point(self)
 
     def add_observation(self, frame, idx):
-        """Add an observation of this Point"""
+        """Add a Frame where this Point was observed"""
         assert idx not in frame.pts
         assert frame not in self.frames
         frame.pts[idx] = self
