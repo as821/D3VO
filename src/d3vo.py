@@ -63,7 +63,7 @@ class D3VO:
         f.pose = pose 
 
         # run optimization every 5 frames
-        if f.id % 5 != 0:
+        if f.id % 2 != 0:
             return False
         
 

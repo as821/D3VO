@@ -40,7 +40,7 @@ class Map:
 		opt_frames, opt_pts = {}, {}
 
 		# add camera
-		# cam = g2o.CameraParameters(1.0, (0.0, 0.0), 0)/
+		#cam = g2o.CameraParameters(1.0, (0.0, 0.0), 0)
 		f = intrinsic[0, 0]
 		cx = intrinsic[0, 2]
 		cy = intrinsic[1, 2]       
@@ -61,10 +61,6 @@ class Map:
 				v_se3.set_fixed(True)       # Hold first frame constant
 			opt.add_vertex(v_se3)
 			opt_frames[f] = v_se3
-
-			# confirm pose correctness
-			#assert np.allclose(init_pose[0:3, 0:3], v_se3.estimate().rotation().matrix())
-			#assert np.allclose(init_pose[0:3, 3], v_se3.estimate().translation())
 
 		# set up point edges between frames and depths
 		for p in self.points:
@@ -122,46 +118,4 @@ class Map:
 			print(f.pose)
 		return
 		
-
-
-		# # set up frames as vertices
-		# for f in self.frames:
-		#     pose = f.pose
-		#     se3 = g2o.SE3Quat(pose[0:3, 0:3], pose[0:3, 3])     # use frame pose estimate as initialization
-		#     v_se3 = g2o.VertexSE3Expmap()
-		#     v_se3.set_estimate(se3)
-		#     v_se3.set_id(f.id)
-		#     v_se3.set_fixed(f.id <= 1)       # TODO when to hold fixed (first frame of window?)
-		#     opt.add_vertex(v_se3)
-		#     opt_frames[f] = v_se3
-
-		#     # confirm pose correctness
-		#     assert np.allclose(pose[0:3, 0:3], v_se3.estimate().rotation().matrix())
-		#     assert np.allclose(pose[0:3, 3], v_se3.estimate().translation())
-
-		# # set up points as edges between frame vertices
-		# for p in self.points:
-		#     # pt = g2o.VertexSBAPointXYZ()
-		#     # pt.set_id(p.id * 2 + 1)
-		#     # pt.set_estimate(p.pt[0:3])
-		#     # pt.set_marginalized(True)
-		#     # pt.set_fixed(False)
-		#     # opt.add_vertex(pt)
-		#     # opt_pts[p] = pt
-
-		#     for f in p.frames:
-		#         edge = g2o.EdgeProjectXYZ2UV()
-		#         edge.set_parameter_id(0, 0)
-		#         edge.set_vertex(0, opt_frames[f])
-		#         for idx, f2 in enumerate(p.frames):
-		#             if f2 != f:
-		#                 edge.set_vertex(idx + 1, opt_frames[f])
-
-		#          # TODO this is where we add our energy terms
-		#         edge.set_measurement(f.kps[idx])       
-		#         edge.set_information(np.eye(2))
-
-		#         edge.set_robust_kernel(robust_kernel)
-		#         opt.add_edge(edge)
-
 
