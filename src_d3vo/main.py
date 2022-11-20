@@ -7,11 +7,14 @@ from d3vo import D3VO
 
 from display import display_trajectory
 
+from depth_pose_net import Networks
+
 
 def offline_slam(cap):
 	"""Run D3VO on offline video"""
 	intrinsic = np.array([[F,0,W//2,0],[0,F,H//2,0],[0,0,1,0]])
-	d3vo = D3VO(intrinsic)
+
+	d3vo = D3VO(intrinsic, Networks())
 
 	# Run D3VO offline with prerecorded video
 	i = 0

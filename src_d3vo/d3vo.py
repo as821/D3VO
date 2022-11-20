@@ -4,17 +4,21 @@ from frontend import Frame, Point, match_frame_kps
 import numpy as np
 
 class D3VO:
-    def __init__(self, intrinsic):
+    def __init__(self, intrinsic, net):
         self.intrinsic = intrinsic
         self.mp = Map()
+        self.nn = net
 
 
     def process_frame(self, frame):
         # TODO run DepthNet and PoseNet (these are placeholders)
         frame_shape = frame.shape[:2][::-1]
         np.random.seed(100)           # use same seed for debugging
-        depth = uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
+        uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
         brightness_params = (0, 0)      # a, b
+
+        depth = self.nn.depth(frame)
+
 
         if len(self.mp.frames) == 0:
             # Set first frame pose to identity. Uses homogenous 4x4 matrix
