@@ -29,7 +29,7 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=20):
+	def optimize(self, intrinsic, iter=10):
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
 		solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
@@ -57,13 +57,14 @@ class Map:
 			v_se3 = g2o.VertexSE3Expmap()
 			v_se3.set_estimate(g2o.SE3Quat(init_pose[0:3, 0:3], init_pose[0:3, 3])) 	# use frame pose estimate as initialization
 			v_se3.set_id(f.id * 2)			# even IDs only
-			v_se3.set_fixed(f.id <= 1)       # Hold first frame constant
+			if f.id == 0:
+				v_se3.set_fixed(True)       # Hold first frame constant
 			opt.add_vertex(v_se3)
 			opt_frames[f] = v_se3
 
 			# confirm pose correctness
-			assert np.allclose(init_pose[0:3, 0:3], v_se3.estimate().rotation().matrix())
-			assert np.allclose(init_pose[0:3, 3], v_se3.estimate().translation())
+			#assert np.allclose(init_pose[0:3, 0:3], v_se3.estimate().rotation().matrix())
+			#assert np.allclose(init_pose[0:3, 3], v_se3.estimate().translation())
 
 		# set up point edges between frames and depths
 		for p in self.points:
@@ -73,7 +74,7 @@ class Map:
 
 			# unproject point with depth estimate onto 3D world using the host frame depth estimate
 			host_frame, host_uv_coord = p.get_host_frame()
-			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
+			host_depth_est = host_frame.depth[int(host_uv_coord[0])][int(host_uv_coord[1])]
 			est = unproject(host_uv_coord, host_depth_est, intrinsic)
 			pt.set_estimate(est)			
 			
@@ -110,15 +111,16 @@ class Map:
 			# optimization gives unprojected point in 3D
 			est = opt_pts[p].estimate()[-1]
 			assert est >= 0
-			# p.update_host_depth(est)
-			#print(est)
+			p.update_host_depth(est)
+			# print(est)
 	
 		for f in self.frames:
 			est = opt_frames[f].estimate()
-			pose = np.eye(4)
-			pose[:3, :3] = est.rotation().matrix()
-			pose[:3, 3] = est.translation()
-			print(pose)
+			f.pose = np.eye(4)
+			f.pose[:3, :3] = est.rotation().matrix()
+			f.pose[:3, 3] = est.translation()
+			print(f.pose)
+		return
 		
 
 

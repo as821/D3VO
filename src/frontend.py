@@ -1,8 +1,11 @@
 import numpy as np
 import cv2
 
-NUM_FEATURE = 250
-FEATURE_QUALITY = 0.1
+from helper import fundamentalToRt
+
+
+NUM_FEATURE = 3000
+FEATURE_QUALITY = 0.01
 
 
 def extract_features(img):
@@ -18,7 +21,6 @@ def extract_features(img):
 	return np.array([(int(kp.pt[0]), int(kp.pt[1])) for kp in kps]), des
 
 
-
 def match_frame_kps(f1, f2):
 	"""Match keypoints in the given frames"""
 	bf = cv2.BFMatcher(cv2.NORM_HAMMING)
@@ -26,6 +28,7 @@ def match_frame_kps(f1, f2):
 
 	# Lowe's ratio test (and remove duplicates)
 	idx1, idx2 = [], []
+	pts1, pts2 = [], []
 	s1, s2 = set(), set()
 	for m,n in matches:
 		if m.distance < 0.75 * n.distance and m.distance < 32 and m.queryIdx not in s1 and m.trainIdx not in s2:
@@ -33,11 +36,26 @@ def match_frame_kps(f1, f2):
 			idx2.append(m.trainIdx)
 			s1.add(m.queryIdx)
 			s2.add(m.trainIdx)
+
+			pts1.append(f1.kps[m.queryIdx])
+			pts2.append(f2.kps[m.trainIdx])
+
+
 	assert len(set(idx1)) == len(idx1)
 	assert len(set(idx2)) == len(idx2)
-	return np.array(idx1), np.array(idx2)
 
+	# Get fundamental matrix to then get an estimate of the relative pose between images
+	pts1 = np.int32(pts1)
+	pts2 = np.int32(pts2)
+	F, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
 
+	# only use inlier points
+	mask = mask.ravel().astype(bool)
+	idx1 = np.array(idx1)
+	idx2 = np.array(idx2)
+	idx1 = idx1[mask]
+	idx2 = idx2[mask]
+	return idx1, idx2, fundamentalToRt(F)
 
 
 
