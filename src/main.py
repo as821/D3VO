@@ -5,6 +5,7 @@ import numpy as np
 
 from d3vo import D3VO
 
+from display import display_trajectory
 
 
 def offline_slam(cap):
@@ -22,6 +23,12 @@ def offline_slam(cap):
 			d3vo.process_frame(frame)
 
 			if DEBUG:
+				# plot all poses (invert so they move in correct direction)
+				plt = [d3vo.mp.frames[0].pose]
+				for f in d3vo.mp.frames[1:]:
+					plt.append(np.linalg.inv(f.pose))
+				display_trajectory(plt)
+
 				# show keypoints with matches in this frame
 				n_match = 0		# avg. number of matches of keypoints in the current frame
 				for idx in d3vo.mp.frames[-1].pts:
