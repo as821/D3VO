@@ -48,7 +48,7 @@ class Networks():
 
         
 
-    def depth(self, img, visualize=True):
+    def depth(self, img, visualize=False):
         """Get a depth prediction from DepthNet for the given image"""
         #image_path = "/Users/andrewstange/Desktop/CMU/Fall_2022/16-833/Project/D3VO/monodepth2/assets/test_image.jpg"
 
@@ -67,16 +67,11 @@ class Networks():
         with torch.no_grad():
             features = self.encoder(input_image_pytorch)
             outputs = self.depth_decoder(features)
-        disp = outputs[("disp", 0)]
-
+        disp_resized = torch.nn.functional.interpolate(outputs[("disp", 0)],(original_height, original_width), mode="bilinear", align_corners=False)
+        disp_resized_np = disp_resized.squeeze().cpu().numpy()
 
         if visualize:
-            disp_resized = torch.nn.functional.interpolate(disp,(original_height, original_width), mode="bilinear", align_corners=False)
-
-            # Saving colormapped depth image
-            disp_resized_np = disp_resized.squeeze().cpu().numpy()
             vmax = np.percentile(disp_resized_np, 95)
-
             plt.figure(figsize=(10, 10))
             plt.subplot(211)
             plt.imshow(input_img)
@@ -89,5 +84,5 @@ class Networks():
             plt.axis('off')
 
         # Return as numpy array (self.width, self.heights)
-        return disp.numpy().squeeze().T
+        return disp_resized_np.T
 
