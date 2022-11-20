@@ -96,11 +96,7 @@ class Frame:
 		self.depth = depth
 		self.uncertainty = uncertainty
 		self.brightness_params = brightness_params
-
-		if self.id == 0:
-			self.pose = np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)
-		else:
-			self.pose = pose
+		self.pose = pose
 
 
 		# Run frontend keypoint extractor

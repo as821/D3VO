@@ -23,23 +23,24 @@ def offline_slam(cap):
 			d3vo.process_frame(frame)
 
 			if DEBUG:
-				# plot all poses (invert so they move in correct direction)
-				plt = [d3vo.mp.frames[0].pose]
-				for f in d3vo.mp.frames[1:]:
-					plt.append(np.linalg.inv(f.pose))
-				display_trajectory(plt)
+				# plot all poses (invert poses so they move in correct direction)
+				display_trajectory([np.linalg.inv(f.pose) for f in d3vo.mp.frames])
 
 				# show keypoints with matches in this frame
+				for pidx, p in enumerate(d3vo.mp.frames[-1].kps):
+					if pidx in d3vo.mp.frames[-1].pts:
+						# green for matched keypoints 
+						cv2.circle(frame, [int(i) for i in p], color=(0, 255, 0), radius=3)
+					else:
+						# black for unmatched keypoint in this frame
+						cv2.circle(frame, [int(i) for i in p], color=(0, 0, 0), radius=3)
+
 				n_match = 0		# avg. number of matches of keypoints in the current frame
 				for idx in d3vo.mp.frames[-1].pts:
-					# green for keypoint in this frame
-					pt = d3vo.mp.frames[-1].kps[idx]
-					cv2.circle(frame, [int(i) for i in pt], color=(0, 255, 0), radius=3)
-
 					# red line to connect current keypoint with Point location in other frames
+					pt = [int(i) for i in d3vo.mp.frames[-1].kps[idx]]
 					for f, f_idx in zip(d3vo.mp.frames[-1].pts[idx].frames, d3vo.mp.frames[-1].pts[idx].idxs):
-						f_pt = f.kps[f_idx]
-						cv2.line(frame, [int(i) for i in pt], [int(i) for i in f_pt], (0, 0, 255), thickness=2)
+						cv2.line(frame, pt, [int(i) for i in f.kps[f_idx]], (0, 0, 255), thickness=2)
 					n_match += len(d3vo.mp.frames[-1].pts[idx].frames)
 				if len(d3vo.mp.frames[-1].pts) > 0:
 					n_match /= len(d3vo.mp.frames[-1].pts)

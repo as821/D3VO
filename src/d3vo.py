@@ -17,11 +17,11 @@ class D3VO:
         brightness_params = (0, 0)      # a, b
 
         if len(self.mp.frames) == 0:
-            # Set first frame pose to identity
-            pose = np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)  # identity rotation, no translation
+            # Set first frame pose to identity. Uses homogenous 4x4 matrix
+            pose = np.eye(4) # np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)  # identity rotation, no translation
         else:
             # TODO pose net here, inject some noise until then
-            pose = np.random.rand(1) * np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)
+            pose = np.random.rand(1) * np.eye(4)
 
 
         # Run frontend tracking
