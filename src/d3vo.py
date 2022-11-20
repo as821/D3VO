@@ -12,9 +12,15 @@ class D3VO:
     def process_frame(self, frame):
         # TODO run DepthNet and PoseNet (these are placeholders)
         frame_shape = frame.shape[:2][::-1]
-        depth = uncertainty = np.ones(shape=frame_shape)     # drop image channels
-        pose = np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)  # identity rotation, no translation
+        depth = uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
         brightness_params = (0, 0)      # a, b
+
+        if len(self.mp.frames) == 0:
+            # Set first frame pose to identity
+            pose = np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)  # identity rotation, no translation
+        else:
+            # TODO pose net here, inject some noise until then
+            pose = np.random.rand(1) * np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)
 
 
         # Run frontend tracking
@@ -39,7 +45,10 @@ class D3VO:
 
         # Process f and the preceeding frame with a feature matcher. Iterate over match indices
         prev_f = self.mp.frames[-2]
-        for idx1, idx2 in zip(*match_frame_kps(f, prev_f)):
+        l1, l2, pose = match_frame_kps(f, prev_f)
+
+        # Store matches
+        for idx1, idx2 in zip(l1, l2):
             if idx2 in prev_f.pts:
                 # Point already exists in prev_f
                 prev_f.pts[idx2].add_observation(f, idx1)
@@ -48,6 +57,14 @@ class D3VO:
                 pt = Point(self.mp)
                 pt.add_observation(f, idx1)
                 pt.add_observation(prev_f, idx2)
+
+        # TODO Get a better initial pose estimate (basic approach for now)
+        f.pose = pose 
+
+        # don't run optimization until we have a few frames
+        if f.id < 5:
+            return False
+        
 
         # TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is loop closure
 
