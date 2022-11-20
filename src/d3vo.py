@@ -12,6 +12,7 @@ class D3VO:
     def process_frame(self, frame):
         # TODO run DepthNet and PoseNet (these are placeholders)
         frame_shape = frame.shape[:2][::-1]
+        np.random.seed(100)           # use same seed for debugging
         depth = uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
         brightness_params = (0, 0)      # a, b
 
@@ -61,8 +62,8 @@ class D3VO:
         # TODO Get a better initial pose estimate (basic approach for now)
         f.pose = pose 
 
-        # don't run optimization until we have a few frames
-        if f.id < 5:
+        # run optimization every 5 frames
+        if f.id % 5 != 0:
             return False
         
 
