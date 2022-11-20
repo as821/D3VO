@@ -40,7 +40,6 @@ class Map:
 		opt_frames, opt_pts = {}, {}
 
 		# add camera
-		#cam = g2o.CameraParameters(1.0, (0.0, 0.0), 0)
 		f = intrinsic[0, 0]
 		cx = intrinsic[0, 2]
 		cy = intrinsic[1, 2]       
