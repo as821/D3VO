@@ -1,11 +1,13 @@
 import numpy as np
 import cv2
 
+# Feature extraction hyperparameters
 NUM_FEATURE = 3000
 FEATURE_QUALITY = 0.01
 
 
 def extract_features(img):
+	"""Extract ORB features from given image, return keypoints and their descriptors."""
 	# detection
 	orb = cv2.ORB_create()
 	pts = cv2.goodFeaturesToTrack(np.mean(img, axis=2).astype(np.uint8), NUM_FEATURE, qualityLevel=FEATURE_QUALITY, minDistance=7)
@@ -19,7 +21,7 @@ def extract_features(img):
 
 
 def match_frame_kps(f1, f2):
-	"""Match keypoints in the given frames"""
+	"""Match ORB keypoints in the given frames"""
 	bf = cv2.BFMatcher(cv2.NORM_HAMMING)
 	matches = bf.knnMatch(f1.des, f2.des, k=2)
 
@@ -69,9 +71,6 @@ class Point:
 		self.idxs.append(idx)
 		
 
-
-
-
 class Frame:
 	def __init__(self, map, image, depth, uncertainty, pose, brightness_params):
 		self.id = map.add_frame(self)       # get an ID from the map
@@ -81,7 +80,6 @@ class Frame:
 		self.uncertainty = uncertainty
 		self.brightness_params = brightness_params
 		self.pose = pose
-
 
 		# Run frontend keypoint extractor
 		self.kps, self.des = extract_features(image)

@@ -14,6 +14,7 @@ class Map:
 		self.frame_idx = self.pt_idx = 0
 
 	def add_frame(self, frame):
+		"""Add a Frame to the Map"""
 		# TODO assumes no frame removal in ID assignment
 		assert (type(frame) == Frame)
 		ret = self.frame_idx
@@ -22,6 +23,7 @@ class Map:
 		return ret
 
 	def add_point(self, pt):
+		"""Add a Point to the Map"""
 		# TODO assumes no point removal in ID assignment
 		assert (type(pt) == Point)
 		ret = self.pt_idx
@@ -30,6 +32,7 @@ class Map:
 		return ret
 
 	def optimize(self, intrinsic, iter=10):
+		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
 		solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())

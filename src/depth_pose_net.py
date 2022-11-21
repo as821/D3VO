@@ -111,6 +111,7 @@ class Networks():
 
 
     def pose(self, img1, img2):
+        """Pass provided image pair through PoseNet. Returns pose estimate (4x4 homogenous matrix) from img1 to img2."""
         # Resize images to fit the pose network
         assert img1.shape == img2.shape
         img1 = pil.fromarray(img1)
@@ -121,8 +122,6 @@ class Networks():
         with torch.no_grad():
             feat = [self.pose_encoder(all_color_aug)]
             axisangle, translation = self.pose_decoder(feat)
-
-        # TODO think this is correct, have to double check with monodepth2 + kitti
         return transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy().squeeze()
 
 

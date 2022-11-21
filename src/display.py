@@ -5,11 +5,13 @@ import matplotlib.pyplot as plt
 import time
 
 def homogenous(pt):
+    """Convert provided point into homogenous coordinates by appending a 1"""
     assert pt.shape == (3,)
     return np.concatenate((pt, np.array([1])))
 
 
-#plt.ion()
+# Allow the trajectory plot to be updated in the same 
+# figure (avoids having to open/close new figures for every plot)
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
 ax.set_xlabel('X', fontsize=20)
@@ -18,6 +20,9 @@ ax.set_zlabel('Z')
 plt.draw()
 
 def display_trajectory(poses):
+    """Barebones visualization that propagates a point starting at the origin through the 
+    provided list of poses. Unclear if this actually tracks the trajectory properly, but 
+    gives a good sense of pose consistency"""
     # poses are relative poses, must compose them
     xdata, ydata, zdata = [0], [0], [0]
     pt = np.array([0, 0, 0])

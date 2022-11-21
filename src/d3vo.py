@@ -1,17 +1,18 @@
 from optimizer import Map
 from frontend import Frame, Point, match_frame_kps
-
+from depth_pose_net import Networks
 import numpy as np
 
 class D3VO:
-    def __init__(self, intrinsic, net):
+    def __init__(self, intrinsic):
         self.intrinsic = intrinsic
         self.mp = Map()
-        self.nn = net
-
+        self.nn = Networks()
 
     def process_frame(self, frame, optimize=False):
-        # TODO run DepthNet and PoseNet (these are placeholders)
+        """Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
+        and backend optimization (if optimize == True)."""
+        # TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)
         frame_shape = frame.shape[:2][::-1]
         np.random.seed(100)           # use same seed for debugging
         uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
@@ -63,12 +64,6 @@ class D3VO:
                 pt.add_observation(f, idx1)
                 pt.add_observation(prev_f, idx2)
 
-        f.pose = pose 
-
-        # run optimization every 5 frames
-        if f.id % 2 != 0:
-            return False
-
-        # TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is loop closure
+        # TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
 
         return True

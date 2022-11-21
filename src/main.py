@@ -7,14 +7,13 @@ from d3vo import D3VO
 
 from display import display_trajectory
 from helper import calc_avg_matches
-from depth_pose_net import Networks
 
 
-def offline_slam(cap):
+def offline_vo(cap):
 	"""Run D3VO on offline video"""
 	intrinsic = np.array([[F,0,W//2,0],[0,F,H//2,0],[0,0,1,0]])
 
-	d3vo = D3VO(intrinsic, Networks())
+	d3vo = D3VO(intrinsic)
 
 	# Run D3VO offline with prerecorded video
 	i = 0
@@ -79,7 +78,8 @@ if __name__ == "__main__":
 		W = 1024
 	print("using camera %dx%d with F %f" % (W,H,F))
 
-	offline_slam(cap)
+	# run offline visual odometry on provided video
+	offline_vo(cap)
 
 
 
