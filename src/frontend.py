@@ -1,9 +1,6 @@
 import numpy as np
 import cv2
 
-from helper import fundamentalToRt
-
-
 NUM_FEATURE = 3000
 FEATURE_QUALITY = 0.01
 
@@ -40,22 +37,9 @@ def match_frame_kps(f1, f2):
 			pts1.append(f1.kps[m.queryIdx])
 			pts2.append(f2.kps[m.trainIdx])
 
-
 	assert len(set(idx1)) == len(idx1)
 	assert len(set(idx2)) == len(idx2)
-
-	# Get fundamental matrix to then get an estimate of the relative pose between images
-	pts1 = np.int32(pts1)
-	pts2 = np.int32(pts2)
-	F, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
-
-	# only use inlier points
-	mask = mask.ravel().astype(bool)
-	idx1 = np.array(idx1)
-	idx2 = np.array(idx2)
-	idx1 = idx1[mask]
-	idx2 = idx2[mask]
-	return idx1, idx2, fundamentalToRt(F)
+	return idx1, idx2
 
 
 

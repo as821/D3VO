@@ -6,7 +6,7 @@ import numpy as np
 from d3vo import D3VO
 
 from display import display_trajectory
-
+from helper import calc_avg_matches
 from depth_pose_net import Networks
 
 
@@ -27,7 +27,7 @@ def offline_slam(cap):
 
 			if DEBUG:
 				# plot all poses (invert poses so they move in correct direction)
-				display_trajectory([np.linalg.inv(f.pose) for f in d3vo.mp.frames])
+				display_trajectory([f.pose for f in d3vo.mp.frames])
 
 				# show keypoints with matches in this frame
 				for pidx, p in enumerate(d3vo.mp.frames[-1].kps):
@@ -38,16 +38,8 @@ def offline_slam(cap):
 						# black for unmatched keypoint in this frame
 						cv2.circle(frame, [int(i) for i in p], color=(0, 0, 0), radius=3)
 
-				n_match = 0		# avg. number of matches of keypoints in the current frame
-				for idx in d3vo.mp.frames[-1].pts:
-					# red line to connect current keypoint with Point location in other frames
-					pt = [int(i) for i in d3vo.mp.frames[-1].kps[idx]]
-					for f, f_idx in zip(d3vo.mp.frames[-1].pts[idx].frames, d3vo.mp.frames[-1].pts[idx].idxs):
-						cv2.line(frame, pt, [int(i) for i in f.kps[f_idx]], (0, 0, 255), thickness=2)
-					n_match += len(d3vo.mp.frames[-1].pts[idx].frames)
-				if len(d3vo.mp.frames[-1].pts) > 0:
-					n_match /= len(d3vo.mp.frames[-1].pts)
-
+				# Calculate the average number of frames each point in the last frame is also visible in
+				n_match, frame = calc_avg_matches(d3vo.mp.frames[-1], frame, show_correspondence=False)
 				print("Matches: %d / %d (%f)" % (len(d3vo.mp.frames[-1].pts), len(d3vo.mp.frames[-1].kps), n_match))
 
 		else:

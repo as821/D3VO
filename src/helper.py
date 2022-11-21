@@ -1,5 +1,5 @@
 import numpy as np
-
+import cv2
 
 def project(pt, intrinsic):
     """Project the specified 3D point onto 2D camera plane using known camera intrinsics"""
@@ -26,33 +26,19 @@ def unproject(pt, depth, intrinsic):
 
 
 
+def calc_avg_matches(frame, out_frame, show_correspondence=False):
+    """Return the average number of matches each keypoint in the specified frame has. 
+    Visualize these matches if show_correspondence=True"""
+    n_match = 0		# avg. number of matches of keypoints in the current frame
+    for idx in frame.pts:
+        # red line to connect current keypoint with Point location in other frames
+        pt = [int(i) for i in frame.kps[idx]]
+        if show_correspondence:
+            for f, f_idx in zip(frame.pts[idx].frames, frame.pts[idx].idxs):
+                cv2.line(out_frame, pt, [int(i) for i in f.kps[f_idx]], (0, 0, 255), thickness=2)
+        n_match += len(frame.pts[idx].frames)
+    if len(frame.pts) > 0:
+        n_match /= len(frame.pts)
+    return n_match, out_frame
 
-import os
-
-
-### TODO just helpers for now
-def poseRt(R, t):
-  ret = np.eye(4)
-  ret[:3, :3] = R
-  ret[:3, 3] = t
-  return ret
-
-# pose
-def fundamentalToRt(F):
-  W = np.mat([[0,-1,0],[1,0,0],[0,0,1]],dtype=float)
-  U,d,Vt = np.linalg.svd(F)
-  if np.linalg.det(U) < 0:
-    U *= -1.0
-  if np.linalg.det(Vt) < 0:
-    Vt *= -1.0
-  R = np.dot(np.dot(U, W), Vt)
-  if np.sum(R.diagonal()) < 0:
-    R = np.dot(np.dot(U, W.T), Vt)
-  t = U[:, 2]
-
-  # TODO: Resolve ambiguities in better ways. This is wrong.
-  if t[2] < 0:
-    t *= -1
-  
-  return np.linalg.inv(poseRt(R, t))
 

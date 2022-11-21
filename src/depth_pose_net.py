@@ -111,7 +111,6 @@ class Networks():
 
 
     def pose(self, img1, img2):
-        # TODO very likely something is wrong here, double check once KITTI is downloaded
         # Resize images to fit the pose network
         assert img1.shape == img2.shape
         img1 = pil.fromarray(img1)
@@ -120,7 +119,8 @@ class Networks():
         img2 = transforms.ToTensor()(img2.resize((self.w, self.h), pil.LANCZOS)).unsqueeze(0)
         all_color_aug = torch.cat((img1, img2), 1)
         with torch.no_grad():
-            axisangle, translation = self.pose_decoder([self.pose_encoder(all_color_aug)])
+            feat = [self.pose_encoder(all_color_aug)]
+            axisangle, translation = self.pose_decoder(feat)
 
         # TODO think this is correct, have to double check with monodepth2 + kitti
         return transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy().squeeze()

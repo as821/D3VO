@@ -12,6 +12,9 @@ def homogenous(pt):
 #plt.ion()
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
+ax.set_xlabel('X', fontsize=20)
+ax.set_ylabel('Y')
+ax.set_zlabel('Z')
 plt.draw()
 
 def display_trajectory(poses):

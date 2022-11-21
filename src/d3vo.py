@@ -10,7 +10,7 @@ class D3VO:
         self.nn = net
 
 
-    def process_frame(self, frame):
+    def process_frame(self, frame, optimize=False):
         # TODO run DepthNet and PoseNet (these are placeholders)
         frame_shape = frame.shape[:2][::-1]
         np.random.seed(100)           # use same seed for debugging
@@ -32,7 +32,8 @@ class D3VO:
             return
 
         # Run backend optimization
-        #self.mp.optimize(self.intrinsic)
+        if optimize:
+            self.mp.optimize(self.intrinsic)
 
 
     def frontend(self, frame, depth, uncertainty, pose, brightness_params):
@@ -49,7 +50,7 @@ class D3VO:
 
         # Process f and the preceeding frame with a feature matcher. Iterate over match indices
         prev_f = self.mp.frames[-2]
-        l1, l2, _ = match_frame_kps(f, prev_f)
+        l1, l2 = match_frame_kps(f, prev_f)
 
         # Store matches
         for idx1, idx2 in zip(l1, l2):
@@ -62,13 +63,11 @@ class D3VO:
                 pt.add_observation(f, idx1)
                 pt.add_observation(prev_f, idx2)
 
-        # TODO Get a better initial pose estimate (basic approach for now)
         f.pose = pose 
 
         # run optimization every 5 frames
         if f.id % 2 != 0:
             return False
-        
 
         # TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is loop closure
 
