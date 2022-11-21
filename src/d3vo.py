@@ -17,23 +17,22 @@ class D3VO:
         uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
         brightness_params = (0, 0)      # a, b
 
+        # Run DepthNet to get depth map
         depth = self.nn.depth(frame)
 
-
         if len(self.mp.frames) == 0:
-            # Set first frame pose to identity. Uses homogenous 4x4 matrix
-            pose = np.eye(4) # np.concatenate((np.eye(3), np.zeros(shape=(3, 1))), axis=1)  # identity rotation, no translation
+            # Set first frame pose to identity rotation and no translation. Uses homogenous 4x4 matrix
+            pose = np.eye(4)
         else:
-            # TODO pose net here, inject some noise until then
-            pose = np.random.rand(1) * np.eye(4)
-
+            # Pass PoseNet the two most recent frames 
+            pose = self.nn.pose(self.mp.frames[-1].image, frame) #np.random.rand(1) * np.eye(4)
 
         # Run frontend tracking
         if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
             return
 
         # Run backend optimization
-        self.mp.optimize(self.intrinsic)
+        #self.mp.optimize(self.intrinsic)
 
 
     def frontend(self, frame, depth, uncertainty, pose, brightness_params):
@@ -50,7 +49,7 @@ class D3VO:
 
         # Process f and the preceeding frame with a feature matcher. Iterate over match indices
         prev_f = self.mp.frames[-2]
-        l1, l2, pose = match_frame_kps(f, prev_f)
+        l1, l2, _ = match_frame_kps(f, prev_f)
 
         # Store matches
         for idx1, idx2 in zip(l1, l2):
