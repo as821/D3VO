@@ -26,10 +26,16 @@ class PoseCNN(nn.Module):
         self.convs[6] = nn.Conv2d(256, 256, 3, 2, 1)
 
         self.pose_conv = nn.Conv2d(256, 6 * (num_input_frames - 1), 1)
+        self.a_conv = nn.Conv2d(256, num_input_frames - 1, 1)
+        self.b_conv = nn.Conv2d(256, num_input_frames - 1, 1)
 
         self.num_convs = len(self.convs)
 
         self.relu = nn.ReLU(True)
+
+        self.tanh = nn.Tanh(True)
+
+        self.softplus = nn.Softplus(True)
 
         self.net = nn.ModuleList(list(self.convs.values()))
 
@@ -39,12 +45,22 @@ class PoseCNN(nn.Module):
             out = self.convs[i](out)
             out = self.relu(out)
 
-        out = self.pose_conv(out)
-        out = out.mean(3).mean(2)
+        out_pose = self.pose_conv(out)
+        out_pose = out_pose.mean(3).mean(2)
+        out_a = self.a_conv(out)
+        out_a = self.softplus(out_a)
+        out_a = out_a.mean(3).mean(2)
+        out_b = self.b_conv(out)
+        out_b = self.tanh(out_b)
+        out_b = out_b.mean(3).mean(2)
 
-        out = 0.01 * out.view(-1, self.num_input_frames - 1, 1, 6)
+        out_pose = 0.01 * out_pose.view(-1, self.num_input_frames - 1, 1, 6)
+        out_a = 0.01 * out_a.view(-1, self.num_input_frames - 1, 1, 1)
+        out_b = 0.01 * out_b.view(-1, self.num_input_frames - 1, 1, 1)
 
-        axisangle = out[..., :3]
-        translation = out[..., 3:]
+        axisangle = out_pose[..., :3]
+        translation = out_pose[..., 3:]
+        a = out_a
+        b = out_b
 
-        return axisangle, translation
+        return axisangle, translation, a, b
