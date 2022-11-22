@@ -1,8 +1,6 @@
 import numpy as np
-from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 
-import time
 
 def homogenous(pt):
     """Convert provided point into homogenous coordinates by appending a 1"""
@@ -31,6 +29,13 @@ def display_trajectory(poses):
         xdata.append(pt[0])
         ydata.append(pt[1])
         zdata.append(pt[2])
+
+    # Remove old points, redraw axes without redrawing the figure in a new window
+    plt.cla()
+    ax = fig.add_subplot(projection='3d')
+    ax.set_xlabel('X', fontsize=20)
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
 
     # dotted lines between pose points
     for i in range(len(xdata)-1):

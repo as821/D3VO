@@ -2,14 +2,18 @@ import sys
 import cv2
 import os
 import numpy as np
+import argparse
 
 from d3vo import D3VO
-
 from display import display_trajectory
-from helper import calc_avg_matches
+from helper import calc_avg_matches, evaluate_pose
 
 
-def offline_vo(cap):
+DEBUG = True
+PER_FRAME_ERROR = True
+
+
+def offline_vo(cap, gt_path, save_path):
 	"""Run D3VO on offline video"""
 	intrinsic = np.array([[F,0,W//2,0],[0,F,H//2,0],[0,0,1,0]])
 
@@ -41,6 +45,12 @@ def offline_vo(cap):
 				n_match, frame = calc_avg_matches(d3vo.mp.frames[-1], frame, show_correspondence=False)
 				print("Matches: %d / %d (%f)" % (len(d3vo.mp.frames[-1].pts), len(d3vo.mp.frames[-1].kps), n_match))
 
+			# Run evaluation
+			if gt_path != "" and PER_FRAME_ERROR:
+				# Do not include identity pose of first frame in evaluation
+				ates = evaluate_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
+				if len(ates) > 0:
+					print("Trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
 		else:
 			break
 		i += 1
@@ -49,28 +59,36 @@ def offline_vo(cap):
 			cv2.imshow('d3vo', frame)
 			if cv2.waitKey(1) == 27:     # Stop if ESC is pressed
 				break
+	
+	# Final trajectory evaluation
+	if gt_path != "":
+		# Do not include identity pose of first frame in evaluation
+		ates = evaluate_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
+		print("\nTotal trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
+
+	# Store pose predictions to a file (do not save identity pose of first frame)
+	save_path = os.path.join(save_path)
+	np.save(save_path, [f.pose for f in d3vo.mp.frames[1:]])
+	print("-> Predictions saved to", save_path)
 
 
 if __name__ == "__main__":
-	# Requires path the video file
-	if len(sys.argv) < 2:
-		print("insufficient number of arguments, expecting path to an .mp4 file")
-		exit(-1)
+	parser = argparse.ArgumentParser()
+	parser.add_argument("path", type=str, help="path to the input video")
+	parser.add_argument("--gt", type=str, default="", help="path to .txt file with ground truth poses")
+	parser.add_argument("--out", type=str, default="poses.npy", help="path to output file to store pose predictions")
+	parser.add_argument("--focal", type=int, default=984, help="focal length of camera")
+	args = parser.parse_args()
 
-	cap = cv2.VideoCapture(sys.argv[1])
+	cap = cv2.VideoCapture(args.path)
 
 	# camera parameters from video (offline, using pre-recorded video)
 	W = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 	H = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 	CNT = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+	F = args.focal
 
-	# allow use of environment variable settings for focal length, seeking
-	F = float(os.getenv("F", default="984"))
-	DEBUG = bool(os.getenv("D", default="True"))
-	if os.getenv("SEEK") is not None:
-		cap.set(cv2.CAP_PROP_POS_FRAMES, int(os.getenv("SEEK")))
-
-	# resize video if needed
+	# downsize video if needed
 	if W > 1024:
 		downscale = 1024.0/W
 		F *= downscale
@@ -79,7 +97,7 @@ if __name__ == "__main__":
 	print("using camera %dx%d with F %f" % (W,H,F))
 
 	# run offline visual odometry on provided video
-	offline_vo(cap)
+	offline_vo(cap, args.gt, args.out)
 
 
 
