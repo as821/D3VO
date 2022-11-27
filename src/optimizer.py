@@ -35,7 +35,7 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=10, verbose=True):
+	def optimize(self, intrinsic, iter=20, verbose=True):
 		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
@@ -47,7 +47,7 @@ class Map:
 		# Initialize an optimizer
 		#opt, opt_frames, opt_pts = orig_optim(self, opt, intrinsic)
 		print("setting up optimization...", end=' ')
-		opt, opt_frames, opt_pts = sba_demo2_optim(self, opt, intrinsic)
+		opt, opt_frames, opt_pts = ba_anchored_depth_optim(self, opt, intrinsic)
 
 		# run optimizer
 		print("initializing optimization...", end=' ')
@@ -74,7 +74,7 @@ class Map:
 			f.pose[:3, 3] = est.translation()
 			#print(f.pose)
 		print("optimization complete")
-		
+
 
 
 

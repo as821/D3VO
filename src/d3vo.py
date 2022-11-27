@@ -66,7 +66,7 @@ class D3VO:
 
         # TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
 
-        if f.id % 5 != 0:
+        if f.id % 10 != 0:
             return False
 
         return True
