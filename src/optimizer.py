@@ -41,8 +41,8 @@ class Map:
 		opt.set_verbose(verbose)
 
 		# Initialize an optimizer
-		opt, opt_frames, opt_pts = orig_optim(self, opt, intrinsic)
-		#opt_frames, opt_pts = simple_optim(self, opt, intrinsic)
+		#opt, opt_frames, opt_pts = orig_optim(self, opt, intrinsic)
+		opt, opt_frames, opt_pts = simple_optim(self, opt, intrinsic)
 
 		# run optimizer
 		opt.initialize_optimization()
@@ -67,7 +67,7 @@ class Map:
 
 
 def simple_optim(self, opt, intrinsic):
-	"""Simple experimental optimizer, just try to get something to improve over PoseNet-only 30 frame error (0.005, std: 0.004)"""
+	"""Simple experimental optimizer, just try to get something to improve over PoseNet-only 30 frame error (0.005, std: 0.004). Current 30 frame error: 0.069, std: 0.036"""
 	opt_frames, opt_pts = {}, {}
 	
 	# add camera
@@ -83,9 +83,8 @@ def simple_optim(self, opt, intrinsic):
 	# set up frames as vertices
 	for f in self.frames:
 		# add frame to the optimization graph as an SE(3) pose
-		init_pose = f.pose
-		v_se3 = g2o.VertexSE3Expmap()
-		v_se3.set_estimate(g2o.SE3Quat(init_pose[0:3, 0:3], init_pose[0:3, 3])) 	# use frame pose estimate as initialization
+		v_se3 = g2o.VertexSE3()
+		v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]).Isometry3d()) 	# use frame pose estimate as initialization
 		v_se3.set_id(f.id * 2)			# even IDs only
 		if f.id == 0:
 			v_se3.set_fixed(True)       # Hold first frame constant
