@@ -35,7 +35,7 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=20, verbose=True):
+	def optimize(self, intrinsic, iter=10, verbose=True):
 		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
@@ -47,7 +47,7 @@ class Map:
 		# Initialize an optimizer
 		#opt, opt_frames, opt_pts = orig_optim(self, opt, intrinsic)
 		print("setting up optimization...", end=' ')
-		opt, opt_frames, opt_pts = ba_anchored_depth_optim(self, opt, intrinsic)
+		opt, opt_frames, opt_pts = simple_optim(self, opt, intrinsic)
 
 		# run optimizer
 		print("initializing optimization...", end=' ')
@@ -59,12 +59,12 @@ class Map:
 		# store optimization results 
 		for p in self.points:
 			# optimization gives unprojected point in 3D
-			est = invert_depth(opt_pts[p].estimate())[-1]
-			#assert est >= 0
-			if est < 0:
-				print("ERROR: INVALID POINT DEPTH", est)
-				est = 0
-				print(opt_pts[p].estimate())
+			est = opt_pts[p].estimate()[-1]
+			assert est >= 0
+			# if est < 0:
+			# 	print("ERROR: INVALID POINT DEPTH", est)
+			# 	est = 0
+			# 	print(opt_pts[p].estimate())
 			p.update_host_depth(est)
 	
 		for f in self.frames:
@@ -238,7 +238,7 @@ def simple_optim(self, opt, intrinsic):
 		v_se3 = g2o.VertexSE3()
 		v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]).Isometry3d()) 	# use frame pose estimate as initialization
 		v_se3.set_id(f.id * 2)			# even IDs only
-		if f.id == 0:
+		if f.id < 2:
 			v_se3.set_fixed(True)       # Hold first frame constant
 		opt.add_vertex(v_se3)
 		opt_frames[f] = v_se3
