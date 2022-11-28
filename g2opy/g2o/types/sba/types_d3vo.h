@@ -39,6 +39,7 @@ namespace g2o {
 namespace types_six_dof_expmap {
 }
 
+// 3-way edge between two Frames and a Point
 class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D>
 {
 public:
@@ -55,6 +56,58 @@ public:
   virtual void linearizeOplus ();
   CameraParameters * _cam;
 };
+
+
+
+// Vertex class for a single Point (represented by its depth)
+class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>
+{
+  public:
+    EIGEN_MAKE_ALIGNED_OPERATOR_NEW    
+    VertexD3VOPointDepth(const int u, const int v) : _u(u), _v(v) {}
+    virtual bool read(std::istream& is);
+    virtual bool write(std::ostream& os) const;
+
+    virtual void setToOriginImpl() { _estimate = 0.; }
+
+    virtual void oplusImpl(const double* update) {_estimate += *update;}
+
+    virtual bool setEstimateDataImpl(const double* est){
+        _estimate = *est;
+        return true;
+    }
+
+    virtual bool getEstimateData(double* est) const{
+        *est = _estimate;
+        return true;
+    }
+
+    // Don't want to have to mess with copy constructors + inheritance, setEstimateDataImpl works for our uses
+    // virtual void setEstimate(const VertexD3VOPointDepth& vert){
+    //   self._estimate = vert._estimate
+    // }
+
+    virtual int estimateDimension() const {return 1;}
+
+    virtual bool setMinimalEstimateDataImpl(const double* est){
+        _estimate = *est;
+        return true;
+    }
+
+    virtual bool getMinimalEstimateData(double* est) const{
+        *est = _estimate;
+        return true;
+    }
+
+    virtual int minimalEstimateDimension() const {return 1;}
+
+  private:
+    // Pixel coordinates in this Point's host frame
+    int _u, _v;
+};
+
+
+
 
 
 

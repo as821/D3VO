@@ -35,6 +35,8 @@ void declareTypes(py::module & m) {
     declareTypesSixDofExpmap(m);
     declareSBACam(m);
 
+    declareD3VO(m);
+
     // sim3
     declareSim3(m);
     declareTypesSevenDofExpmap(m);
