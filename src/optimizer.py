@@ -66,7 +66,7 @@ class Map:
 		# set up point edges between frames and depths
 		for p in self.points:
 			# setup vertex for depth estimate
-			pt = g2o.VertexPointXYZ()
+			pt = g2o.VertexD3VOPointDepth(0, 0)
 			pt.set_id(p.id * 2 + 1)		# odd IDs, no collisions with frame ID
 
 			# unproject point with depth estimate onto 3D world using the host frame depth estimate
