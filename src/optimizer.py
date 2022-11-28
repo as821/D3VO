@@ -41,7 +41,7 @@ class Map:
 		opt.set_verbose(True)
 
 		opt_frames, opt_pts = {}, {}
-
+	
 		# add camera
 		f = intrinsic[0, 0]
 		cx = intrinsic[0, 2]
@@ -55,11 +55,10 @@ class Map:
 		# set up frames as vertices
 		for f in self.frames:
 			# add frame to the optimization graph as an SE(3) pose
-			init_pose = f.pose
-			v_se3 = g2o.VertexSE3Expmap()
-			v_se3.set_estimate(g2o.SE3Quat(init_pose[0:3, 0:3], init_pose[0:3, 3])) 	# use frame pose estimate as initialization
+			v_se3 = g2o.VertexSE3()
+			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]).Isometry3d()) 	# use frame pose estimate as initialization
 			v_se3.set_id(f.id * 2)			# even IDs only
-			if f.id == 0:
+			if f.id < 2:
 				v_se3.set_fixed(True)       # Hold first frame constant
 			opt.add_vertex(v_se3)
 			opt_frames[f] = v_se3
@@ -81,9 +80,9 @@ class Map:
 			opt.add_vertex(pt)
 
 			# host frame connects to every edge involving this point
-			for idx, f  in enumerate(p.frames[1:]):
+			for idx, f in enumerate(p.frames[1:]):
 				idx += 1													# avoid off by one, skipping host frame
-				edge = g2o.EdgeProjectD3VO()								# or EdgeProjectXYZ2UV??
+				edge = g2o.EdgeProjectD3VO() 								
 				edge.resize(3)
 				edge.set_vertex(0, pt)										# connect to depth estimate
 				edge.set_vertex(1, opt_frames[host_frame])					# connect to host frame
