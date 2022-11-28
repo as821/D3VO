@@ -69,6 +69,13 @@ void declareTypesSixDofExpmap(py::module & m) {
     ;
 
 
+    py::class_<EdgeProjectD3VO, BaseMultiEdge<2, Vector2D>>(m, "EdgeProjectD3VO")
+        .def(py::init())
+        .def("compute_error", &EdgeProjectD3VO::computeError)
+        .def("linearize_oplus", &EdgeProjectD3VO::linearizeOplus)
+    ;
+
+
     //Stereo Observations
     templatedBaseBinaryEdge<3, Vector3D, VertexSBAPointXYZ, VertexSE3Expmap>(m, "_3_Vector3D_VertexSBAPointXYZ_VertexSE3Expmap");
     py::class_<EdgeProjectXYZ2UVU, BaseBinaryEdge<3, Vector3D, VertexSBAPointXYZ, VertexSE3Expmap>>(m, "EdgeProjectXYZ2UVU")

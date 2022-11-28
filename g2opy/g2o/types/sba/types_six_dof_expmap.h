@@ -172,6 +172,24 @@ public:
 };
 
 
+class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D>
+{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeProjectD3VO()  {
+    resizeParameters(1);
+    installParameter(_cam, 0);
+  }
+
+  virtual bool read  (std::istream& is);
+  virtual bool write (std::ostream& os) const;
+  void computeError  ();
+  virtual void linearizeOplus ();
+  CameraParameters * _cam;
+};
+
+
 
 //Stereo Observations
 // U: left u

@@ -83,7 +83,7 @@ class Map:
 			# host frame connects to every edge involving this point
 			for idx, f  in enumerate(p.frames[1:]):
 				idx += 1													# avoid off by one, skipping host frame
-				edge = g2o.EdgeProjectPSI2UV()								# or EdgeProjectXYZ2UV??
+				edge = g2o.EdgeProjectD3VO()								# or EdgeProjectXYZ2UV??
 				edge.resize(3)
 				edge.set_vertex(0, pt)										# connect to depth estimate
 				edge.set_vertex(1, opt_frames[host_frame])					# connect to host frame
