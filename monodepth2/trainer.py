@@ -286,9 +286,15 @@ class Trainer:
                     elif self.opt.pose_model_type == "posecnn":
                         pose_inputs = torch.cat(pose_inputs, 1)
 
-                    axisangle, translation = self.models["pose"](pose_inputs)
+                    axisangle, translation, a, b = self.models["pose"](pose_inputs)
                     outputs[("axisangle", 0, f_i)] = axisangle
                     outputs[("translation", 0, f_i)] = translation
+                    if f_i < 0:
+                        outputs[("a", 0, f_i)] = 1/a[:,0]
+                        outputs[("b", 0, f_i)] = -b[:,0]/a[:,0]
+                    else:
+                        outputs[("a", 0, f_i)] = a[:,0]
+                        outputs[("b", 0, f_i)] = b[:,0]
 
                     # Invert the matrix if the frame id is negative
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
@@ -306,7 +312,7 @@ class Trainer:
             elif self.opt.pose_model_type == "shared":
                 pose_inputs = [features[i] for i in self.opt.frame_ids if i != "s"]
 
-            axisangle, translation = self.models["pose"](pose_inputs)
+            axisangle, translation, a, b = self.models["pose"](pose_inputs)
 
             for i, f_i in enumerate(self.opt.frame_ids[1:]):
                 if f_i != "s":
@@ -314,6 +320,9 @@ class Trainer:
                     outputs[("translation", 0, f_i)] = translation
                     outputs[("cam_T_cam", 0, f_i)] = transformation_from_parameters(
                         axisangle[:, i], translation[:, i])
+                    outputs[("a", 0, f_i)] = a[:,i]
+                    outputs[("b", 0, f_i)] = b[:,i]
+
 
         return outputs
 
@@ -413,6 +422,7 @@ class Trainer:
         for scale in self.opt.scales:
             loss = 0
             reprojection_losses = []
+            ab_losses = []
 
             if self.opt.v1_multiscale:
                 source_scale = scale
@@ -425,9 +435,15 @@ class Trainer:
 
             for frame_id in self.opt.frame_ids[1:]:
                 pred = outputs[("color", frame_id, scale)]
-                reprojection_losses.append(self.compute_reprojection_loss(pred, target))
+                a = outputs[("a", 0, frame_id)].unsqueeze(1)
+                b = outputs[("b", 0, frame_id)].unsqueeze(1)
+                target_frame = target*a + b
+                reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame))
+                ab_losses.append((a-1)**2 + b**2)
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
+            ab_losses = torch.cat(ab_losses, 1)
+            ab_loss = ab_losses.sum(1, True)
 
             if not self.opt.disable_automasking:
                 identity_reprojection_losses = []
@@ -486,8 +502,10 @@ class Trainer:
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
             smooth_loss = get_smooth_loss(norm_disp, color)
+            reg_loss = smooth_loss + self.opt.ab_weight * ab_loss
 
-            loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            loss += self.opt.disparity_smoothness * reg_loss / (2 ** scale)
+
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
 
