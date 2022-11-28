@@ -186,47 +186,47 @@ void EdgeProjectPSI2UV::computeError(){
 
 
 
-bool EdgeProjectD3VO::write(std::ostream& os) const  {
-  os << _cam->id() << " ";
-  for (int i=0; i<2; i++){
-    os << measurement()[i] << " ";
-  }
+// bool EdgeProjectD3VO::write(std::ostream& os) const  {
+//   os << _cam->id() << " ";
+//   for (int i=0; i<2; i++){
+//     os << measurement()[i] << " ";
+//   }
 
-  for (int i=0; i<2; i++)
-    for (int j=i; j<2; j++){
-      os << " " <<  information()(i,j);
-    }
-  return os.good();
-}
+//   for (int i=0; i<2; i++)
+//     for (int j=i; j<2; j++){
+//       os << " " <<  information()(i,j);
+//     }
+//   return os.good();
+// }
 
-bool EdgeProjectD3VO::read(std::istream& is) {
-  int paramId;
-  is >> paramId;
-  setParameterId(0, paramId);
+// bool EdgeProjectD3VO::read(std::istream& is) {
+//   int paramId;
+//   is >> paramId;
+//   setParameterId(0, paramId);
 
-  for (int i=0; i<2; i++){
-    is >> _measurement[i];
-  }
-  for (int i=0; i<2; i++)
-    for (int j=i; j<2; j++) {
-      is >> information()(i,j);
-      if (i!=j)
-        information()(j,i)=information()(i,j);
-    }
-  return true;
-}
+//   for (int i=0; i<2; i++){
+//     is >> _measurement[i];
+//   }
+//   for (int i=0; i<2; i++)
+//     for (int j=i; j<2; j++) {
+//       is >> information()(i,j);
+//       if (i!=j)
+//         information()(j,i)=information()(i,j);
+//     }
+//   return true;
+// }
 
-void EdgeProjectD3VO::computeError(){
-  const VertexSBAPointXYZ * psi = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-  const VertexSE3Expmap * T_p_from_world = static_cast<const VertexSE3Expmap*>(_vertices[1]);
-  const VertexSE3Expmap * T_anchor_from_world = static_cast<const VertexSE3Expmap*>(_vertices[2]);
-  const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
+// void EdgeProjectD3VO::computeError(){
+//   const VertexSBAPointXYZ * psi = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
+//   const VertexSE3Expmap * T_p_from_world = static_cast<const VertexSE3Expmap*>(_vertices[1]);
+//   const VertexSE3Expmap * T_anchor_from_world = static_cast<const VertexSE3Expmap*>(_vertices[2]);
+//   const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
 
-  Vector2D obs(_measurement);
-  _error = obs - cam->cam_map(T_p_from_world->estimate()
-        *T_anchor_from_world->estimate().inverse()
-        *invert_depth(psi->estimate()));
-}
+//   Vector2D obs(_measurement);
+//   _error = obs - cam->cam_map(T_p_from_world->estimate()
+//         *T_anchor_from_world->estimate().inverse()
+//         *invert_depth(psi->estimate()));
+// }
 
 
 
@@ -282,25 +282,25 @@ void EdgeProjectPSI2UV::linearizeOplus(){
 
 
 
-void EdgeProjectD3VO::linearizeOplus(){
-  VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
-  Vector3D psi_a = vpoint->estimate();
-  VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
-  SE3Quat T_cw = vpose->estimate();
-  VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
-  const CameraParameters * cam
-      = static_cast<const CameraParameters *>(parameter(0));
+// void EdgeProjectD3VO::linearizeOplus(){
+//   VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
+//   Vector3D psi_a = vpoint->estimate();
+//   VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
+//   SE3Quat T_cw = vpose->estimate();
+//   VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
+//   const CameraParameters * cam
+//       = static_cast<const CameraParameters *>(parameter(0));
 
-  SE3Quat A_aw = vanchor->estimate();
-  SE3Quat T_ca = T_cw*A_aw.inverse();
-  Vector3D x_a = invert_depth(psi_a);
-  Vector3D y = T_ca*x_a;
-  Matrix<double,2,3,Eigen::ColMajor> Jcam
-      = d_proj_d_y(cam->focal_length, y);
-  _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
-  _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
-  _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
-}
+//   SE3Quat A_aw = vanchor->estimate();
+//   SE3Quat T_ca = T_cw*A_aw.inverse();
+//   Vector3D x_a = invert_depth(psi_a);
+//   Vector3D y = T_ca*x_a;
+//   Matrix<double,2,3,Eigen::ColMajor> Jcam
+//       = d_proj_d_y(cam->focal_length, y);
+//   _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
+//   _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
+//   _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
+// }
 
 
 

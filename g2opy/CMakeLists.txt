@@ -6,8 +6,8 @@ PROJECT(g2o)
 # The library prefix
 SET(LIB_PREFIX g2o_)
 
-SET(g2o_C_FLAGS)
-SET(g2o_CXX_FLAGS)
+SET(g2o_C_FLAGS "-Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations")
+SET(g2o_CXX_FLAGS "-Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations")
 
 # default built type
 IF(NOT CMAKE_BUILD_TYPE)
@@ -196,8 +196,8 @@ IF(CMAKE_COMPILER_IS_GNUCXX)
     SET(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -march=native")
   ENDIF()
   # activate warnings !!!
-  SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -W")
-  SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -W")
+  SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations -W")
+  SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations -W")
 ENDIF(CMAKE_COMPILER_IS_GNUCXX)
 
 IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -206,8 +206,8 @@ IF(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   # activate all warnings
   #SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Weverything")
   #SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Weverything")
-  SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall")
-  SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall")
+  SET(g2o_C_FLAGS "${g2o_C_FLAGS} -Wall -Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations")
+  SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -Wno-unused-variable -Wno-unused-value -Wno-deprecated-declarations")
   #SET(g2o_CXX_FLAGS "${g2o_CXX_FLAGS} -Wall -stdlib=libc++")
 ENDIF()
 

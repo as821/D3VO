@@ -41,6 +41,17 @@ void init();
 
 typedef Eigen::Matrix<double, 6, 6, Eigen::ColMajor> Matrix6d;
 
+// Forward declarations needed for types_d3vo.cpp
+Vector2D project2d(const Vector3D& v);
+Vector3D unproject2d(const Vector2D& v);
+Vector3D invert_depth(const Vector3D & x);
+Eigen::Matrix<double,2,3,Eigen::ColMajor> d_proj_d_y(const double & f, const Vector3D & xyz);
+Eigen::Matrix<double,3,6,Eigen::ColMajor> d_expy_d_y(const Vector3D & y);
+Eigen::Matrix<double,2,3,Eigen::ColMajor> d_proj_d_y(const double & f, const Vector3D & xyz);
+Eigen::Matrix<double,3,6,Eigen::ColMajor> d_expy_d_y(const Vector3D & y);
+Matrix3D d_Tinvpsi_d_psi(const SE3Quat & T, const Vector3D & psi);
+
+
 class G2O_TYPES_SBA_API CameraParameters : public g2o::Parameter
 {
   public:
@@ -171,23 +182,6 @@ public:
   CameraParameters * _cam;
 };
 
-
-class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D>
-{
-public:
-  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-
-  EdgeProjectD3VO()  {
-    resizeParameters(1);
-    installParameter(_cam, 0);
-  }
-
-  virtual bool read  (std::istream& is);
-  virtual bool write (std::ostream& os) const;
-  void computeError  ();
-  virtual void linearizeOplus ();
-  CameraParameters * _cam;
-};
 
 
 

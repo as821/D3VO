@@ -1,5 +1,5 @@
 // g2o - General Graph Optimization
-// Copyright (C) 2011 R. Kuemmerle, G. Grisetti, H. Strasdat, W. Burgard
+// Copyright (C) 2011 H. Strasdat
 // All rights reserved.
 //
 // Redistribution and use in source and binary forms, with or without
@@ -24,21 +24,54 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef G2O_OPENGL_WRAPPER_H
-#define G2O_OPENGL_WRAPPER_H
-#define GL_SILENCE_DEPRECATION
-#include "g2o/config.h"
+// #ifndef G2O_SIX_DOF_TYPES_EXPMAP
+// #define G2O_SIX_DOF_TYPES_EXPMAP
 
-#ifdef WINDOWS
-#include <windows.h>
-#endif
+#include "g2o/core/base_vertex.h"
+#include "g2o/core/base_binary_edge.h"
+#include "g2o/core/base_unary_edge.h"
+#include "g2o/types/slam3d/se3_ops.h"
+#include "types_sba.h"
+#include "types_six_dof_expmap.h"
+#include <Eigen/Geometry>
 
-#ifdef G2O_OPENGL_FOUND
-# ifdef __APPLE__
-#  include <OpenGL/gl.h>
-# else
-#  include <GL/gl.h>
-# endif
-#endif
+namespace g2o {
+namespace types_six_dof_expmap {
+}
 
-#endif
+class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D>
+{
+public:
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+  EdgeProjectD3VO()  {
+    resizeParameters(1);
+    installParameter(_cam, 0);
+  }
+
+  virtual bool read  (std::istream& is);
+  virtual bool write (std::ostream& os) const;
+  void computeError  ();
+  virtual void linearizeOplus ();
+  CameraParameters * _cam;
+};
+
+
+
+
+} // end namespace
+
+//#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
