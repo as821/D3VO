@@ -15,12 +15,12 @@ from layers import *
 
 
 class DepthDecoder(nn.Module):
-    def __init__(self, num_ch_enc, scales=range(4), num_output_channels=1, use_skips=True):
+    def __init__(self, num_ch_enc, scales=range(4), num_output_channels=2, use_skips=True):
         super(DepthDecoder, self).__init__()
 
         self.num_output_channels = num_output_channels
         self.use_skips = use_skips
-        self.upsample_mode = 'nearest'
+        self.upsample_mode = "nearest"
         self.scales = scales
 
         self.num_ch_enc = num_ch_enc
@@ -60,6 +60,8 @@ class DepthDecoder(nn.Module):
             x = torch.cat(x, 1)
             x = self.convs[("upconv", i, 1)](x)
             if i in self.scales:
-                self.outputs[("disp", i)] = self.sigmoid(self.convs[("dispconv", i)](x))
+                outs = self.sigmoid(self.convs[("dispconv", i)](x))
+                self.outputs[("disp", i)] = outs[:, 0, :, :]
+                self.outputs[("disp-sigma", i)] = outs[:, 1, :, :]
 
         return self.outputs

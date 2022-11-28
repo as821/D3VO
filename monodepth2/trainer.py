@@ -385,17 +385,21 @@ class Trainer:
                 if not self.opt.disable_automasking:
                     outputs[("color_identity", frame_id, scale)] = inputs[("color", frame_id, source_scale)]
 
-    def compute_reprojection_loss(self, pred, target):
+    def compute_reprojection_loss(self, pred, target, sigma):
         """Computes reprojection loss between a batch of predicted and target images
         """
         abs_diff = torch.abs(target - pred)
-        l1_loss = abs_diff.mean(1, True)
+        l1_loss = abs_diff
 
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
         else:
-            ssim_loss = self.ssim(pred, target).mean(1, True)
+            ssim_loss = (self.ssim(pred, target)) / sigma + torch.log(sigma)
             reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
+
+            reprojection_loss = reprojection_loss / sigma + torch.log(sigma)
+
+        reprojection_loss = reprojection_loss.mean(1, True)
 
         return reprojection_loss
 
@@ -416,6 +420,7 @@ class Trainer:
                 source_scale = 0
 
             disp = outputs[("disp", scale)]
+            sigma = outputs[("disp-sigma", scale)]
             color = inputs[("color", 0, scale)]
             target = inputs[("color", 0, source_scale)]
 
@@ -424,7 +429,7 @@ class Trainer:
                 a = outputs[("a", 0, frame_id)].unsqueeze(1)
                 b = outputs[("b", 0, frame_id)].unsqueeze(1)
                 target_frame = target * a + b
-                reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame))
+                reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame, sigma))
                 ab_losses.append((a - 1) ** 2 + b ** 2)
 
             reprojection_losses = torch.cat(reprojection_losses, 1)
