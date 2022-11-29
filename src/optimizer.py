@@ -55,7 +55,7 @@ class Map:
 		# set up frames as vertices
 		for f in self.frames:
 			# add frame to the optimization graph as an SE(3) pose
-			v_se3 = g2o.VertexSE3()
+			v_se3 = g2o.VertexD3VOFramePose(f.image)
 			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]).Isometry3d()) 	# use frame pose estimate as initialization
 			v_se3.set_id(f.id * 2)			# even IDs only
 			if f.id < 2:
@@ -71,9 +71,9 @@ class Map:
 
 			# unproject point with depth estimate onto 3D world using the host frame depth estimate
 			host_frame, host_uv_coord = p.get_host_frame()
-			host_depth_est = host_frame.depth[int(host_uv_coord[0])][int(host_uv_coord[1])]
-			est = unproject(host_uv_coord, host_depth_est, intrinsic)
-			pt.set_estimate(est)			
+			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
+			#est = unproject(host_uv_coord, host_depth_est, intrinsic)
+			pt.set_estimate(host_depth_est)			
 			
 			pt.set_fixed(False)
 			opt_pts[p] = pt
@@ -106,7 +106,7 @@ class Map:
 		# store optimization results 
 		for p in self.points:
 			# optimization gives unprojected point in 3D
-			est = opt_pts[p].estimate()[-1]
+			est = opt_pts[p].estimate()
 			assert est >= 0
 			p.update_host_depth(est)
 			# print(est)
