@@ -147,8 +147,7 @@ void declareD3VO(py::module & m) {
     ;
 
     py::class_<VertexD3VOFramePose, BaseVertex<6, Isometry3D>>(m, "VertexD3VOFramePose")
-        .def(py::init<>())
-
+        .def(py::init<py::array_t<double>>())
         .def("set_to_origin_impl", &VertexD3VOFramePose::setToOriginImpl)
         .def("set_estimate_data_impl", &VertexD3VOFramePose::setEstimateDataImpl)
         .def("get_estimate_data", &VertexD3VOFramePose::getEstimateData)

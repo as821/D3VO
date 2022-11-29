@@ -68,12 +68,23 @@ inline Vector3D invert_depth(const Vector3D & x){
 }
 
 Vector2D  CameraParameters::cam_map(const Vector3D & trans_xyz) const {
-  Vector2D proj = project2d(trans_xyz);
-  Vector2D res;
-  res[0] = proj[0]*focal_length + principle_point[0];
-  res[1] = proj[1]*focal_length + principle_point[1];
-  return res;
+    // Project 3D point onto 2D pixel coordinate
+    Vector2D proj = project2d(trans_xyz);
+    Vector2D res;
+    res[0] = proj[0]*focal_length + principle_point[0];
+    res[1] = proj[1]*focal_length + principle_point[1];
+    return res;
 }
+
+Vector3D  CameraParameters::cam_unmap(const Vector2D & trans_uv, const double depth) const {
+    // Unproject 2D pixel coordinate onto 3D point
+    Vector3D res;
+    res(0) = (trans_uv(0) - principle_point[0]) / focal_length * depth;
+    res(1) = (trans_uv(1) - principle_point[1]) / focal_length * depth;
+    res(2) = depth;
+    return res;
+}
+
 
 Vector3D CameraParameters::stereocam_uvu_map(const Vector3D & trans_xyz) const {
   Vector2D uv_left = cam_map(trans_xyz);
@@ -651,115 +662,114 @@ void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
 
 
 bool EdgeProjectD3VO::write(std::ostream& os) const  {
-  os << _cam->id() << " ";
-  for (int i=0; i<2; i++){
-    os << measurement()[i] << " ";
-  }
-
-  for (int i=0; i<2; i++)
-    for (int j=i; j<2; j++){
-      os << " " <<  information()(i,j);
+    os << _cam->id() << " ";
+    for (int i=0; i<2; i++){
+        os << measurement()[i] << " ";
     }
-  return os.good();
+
+    for (int i=0; i<2; i++)
+        for (int j=i; j<2; j++){
+        os << " " <<  information()(i,j);
+        }
+    return os.good();
 }
 
 bool EdgeProjectD3VO::read(std::istream& is) {
-  int paramId;
-  is >> paramId;
-  setParameterId(0, paramId);
+    int paramId;
+    is >> paramId;
+    setParameterId(0, paramId);
 
-  for (int i=0; i<2; i++){
-    is >> _measurement[i];
-  }
-  for (int i=0; i<2; i++)
-    for (int j=i; j<2; j++) {
-      is >> information()(i,j);
-      if (i!=j)
-        information()(j,i)=information()(i,j);
+    for (int i=0; i<2; i++){
+        is >> _measurement[i];
     }
-  return true;
+    for (int i=0; i<2; i++)
+        for (int j=i; j<2; j++) {
+        is >> information()(i,j);
+        if (i!=j)
+            information()(j,i)=information()(i,j);
+        }
+    return true;
 }
 
 void EdgeProjectD3VO::computeError(){
-  const VertexSBAPointXYZ * psi = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-  const VertexSE3Expmap * T_p_from_world = static_cast<const VertexSE3Expmap*>(_vertices[1]);
-  const VertexSE3Expmap * T_anchor_from_world = static_cast<const VertexSE3Expmap*>(_vertices[2]);
-  const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
+    /*
+    const VertexSBAPointXYZ * psi = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
+    const VertexSE3Expmap * T_p_from_world = static_cast<const VertexSE3Expmap*>(_vertices[1]);
+    const VertexSE3Expmap * T_anchor_from_world = static_cast<const VertexSE3Expmap*>(_vertices[2]);
+    const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
 
-  Vector2D obs(_measurement);
-  _error = obs - cam->cam_map(T_p_from_world->estimate()
-        *T_anchor_from_world->estimate().inverse()
-        *invert_depth(psi->estimate()));
+    Vector2D obs(_measurement);
+    _error = obs - cam->cam_map(T_p_from_world->estimate()
+            *T_anchor_from_world->estimate().inverse()
+            *invert_depth(psi->estimate()));
+    */
+
+    const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
+    const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
+    const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
+    const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
+
+    // Vector2D obs(_measurement); 
+
+
+    //_error = obs - cam->cam_map(T_p_from_world->estimate() * T_anchor_from_world->estimate().inverse() * invert_depth(psi->estimate()));
+
+    // T_j_i = dest_frame.estimate() * anchor_frame.estimate().inverse();
+    Vector2D p_prime = cam->cam_map(dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate()));
+
+    // TODO need to store pixel intensities in the FramePose objects
+    // _error = 0;
 }
-
 
 void EdgeProjectD3VO::linearizeOplus(){
-  VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
-  Vector3D psi_a = vpoint->estimate();
-  VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
-  SE3Quat T_cw = vpose->estimate();
-  VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
-  const CameraParameters * cam
-      = static_cast<const CameraParameters *>(parameter(0));
+    VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
+    Vector3D psi_a = vpoint->estimate();
+    VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
+    SE3Quat T_cw = vpose->estimate();
+    VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
+    const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
 
-  SE3Quat A_aw = vanchor->estimate();
-  SE3Quat T_ca = T_cw*A_aw.inverse();
-  Vector3D x_a = invert_depth(psi_a);
-  Vector3D y = T_ca*x_a;
-  Matrix<double,2,3,Eigen::ColMajor> Jcam
-      = d_proj_d_y(cam->focal_length, y);
-  _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
-  _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
-  _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
+    SE3Quat A_aw = vanchor->estimate();
+    SE3Quat T_ca = T_cw*A_aw.inverse();
+    Vector3D x_a = invert_depth(psi_a);
+    Vector3D y = T_ca*x_a;
+    Matrix<double,2,3,Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
+    _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
+    _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
+    _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
 }
 
 
 
 
-  VertexD3VOFramePose::VertexD3VOFramePose() : BaseVertex<6, Isometry3D>(), _numOplusCalls(0)
-  {
-    setToOriginImpl();
-    updateCache();
-  }
 
-  bool VertexD3VOFramePose::read(std::istream& is)
-  {
+bool VertexD3VOFramePose::read(std::istream& is)
+{
     Vector7d est;
     for (int i=0; i<7; i++)
       is  >> est[i];
     setEstimate(internal::fromVectorQT(est));
     return true;
-  }
+}
 
-  bool VertexD3VOFramePose::write(std::ostream& os) const
-  {
+bool VertexD3VOFramePose::write(std::ostream& os) const
+{
     Vector7d est=internal::toVectorQT(_estimate);
     for (int i=0; i<7; i++)
       os << est[i] << " ";
     return os.good();
-  }
+}
 
-
-
-
-// TODO 
 bool VertexD3VOPointDepth::read(std::istream& is) {
-  Vector7d est;
-  for (int i=0; i<7; i++)
-    is  >> est[i];
-//   SE3Quat cam2world;
-//   cam2world.fromVector(est);
-//   setEstimate(cam2world.inverse());
-  return true;
+    Vector7d est;
+    for (int i=0; i<7; i++)
+        is  >> est[i];
+    return true;
 }
 
 bool VertexD3VOPointDepth::write(std::ostream& os) const {
-//   SE3Quat cam2world(estimate().inverse());
-//   for (int i=0; i<7; i++)
-//     os << cam2world[i] << " ";
-  return os.good();
+    return os.good();
 }
-// TODO
 
 
 

@@ -39,6 +39,12 @@
 #include "g2o/types/slam3d/isometry3d_mappings.h"
 #include "g2o/types/slam3d/g2o_types_slam3d_api.h"
 
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+
+
+
 namespace g2o {
 namespace types_six_dof_expmap {
 void init();
@@ -60,6 +66,8 @@ class G2O_TYPES_SBA_API CameraParameters : public g2o::Parameter
       baseline(baseline){}
 
     Vector2D cam_map (const Vector3D & trans_xyz) const;
+
+    Vector3D cam_unmap(const Vector2D & trans_uv, const double depth) const;
 
     Vector3D stereocam_uvu_map (const Vector3D & trans_xyz) const;
 
@@ -356,7 +364,12 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-        VertexD3VOPointDepth(const int u, const int v) : _u(u), _v(v) {}
+        // Pixel coordinate in this Point's host frame
+        Vector2D uv;
+
+        VertexD3VOPointDepth(const int u, const int v) {
+            uv = Vector2D(u, v);
+        }
 
         bool read(std::istream& is);
 
@@ -379,9 +392,6 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
             *est = _estimate;
             return true;
         }
-    private:
-        // Pixel coordinate in this Point's host frame
-        int _u, _v;
 };
 
 
@@ -398,80 +408,92 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
  * The parameterization for the increments constructed is a 6d vector
  * (x,y,z,qx,qy,qz) (note that we leave out the w part of the quaternion.
  */
-  class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D>
-  {
+class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D>
+{
     public:
-      EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-      static const int orthogonalizeAfter = 1000; //< orthogonalize the rotation matrix after N updates
+        static const int orthogonalizeAfter = 1000; //< orthogonalize the rotation matrix after N updates
 
-      VertexD3VOFramePose();
+        pybind11::buffer_info pixel_inten;
+       
+        VertexD3VOFramePose(pybind11::array_t<double> pixel_intensity) : BaseVertex<6, Isometry3D>(), _numOplusCalls(0)
+        {
+            setToOriginImpl();
+            updateCache();
 
-      virtual void setToOriginImpl() {
-        _estimate = Isometry3D::Identity();
-      }
+            // Process + store input numpy array
+            pixel_inten = pixel_intensity.request();
 
-      virtual bool read(std::istream& is);
-      virtual bool write(std::ostream& os) const;
-
-      virtual bool setEstimateDataImpl(const double* est){
-        Eigen::Map<const Vector7d> v(est);
-        _estimate=internal::fromVectorQT(v);
-        return true;
-      }
-
-      virtual bool getEstimateData(double* est) const{
-        Eigen::Map<Vector7d> v(est);
-        v = internal::toVectorQT(_estimate);
-        return true;
-      }
-
-      virtual int estimateDimension() const {
-        return 7;
-      }
-
-      virtual bool setMinimalEstimateDataImpl(const double* est){
-        Eigen::Map<const Vector6d> v(est);
-        _estimate = internal::fromVectorMQT(v);
-        return true;
-      }
-
-      virtual bool getMinimalEstimateData(double* est) const{
-        Eigen::Map<Vector6d> v(est);
-        v = internal::toVectorMQT(_estimate);
-        return true;
-      }
-
-      virtual int minimalEstimateDimension() const {
-        return 6;
-      }
-
-      /**
-       * update the position of this vertex. The update is in the form
-       * (x,y,z,qx,qy,qz) whereas (x,y,z) represents the translational update
-       * and (qx,qy,qz) corresponds to the respective elements. The missing
-       * element qw of the quaternion is recovred by
-       * || (qw,qx,qy,qz) || == 1 => qw = sqrt(1 - || (qx,qy,qz) ||
-       */
-      virtual void oplusImpl(const double* update)
-      {
-        Eigen::Map<const Vector6d> v(update);
-        Isometry3D increment = internal::fromVectorMQT(v);
-        _estimate = _estimate * increment;
-        if (++_numOplusCalls > orthogonalizeAfter) {
-          _numOplusCalls = 0;
-          internal::approximateNearestOrthogonalMatrix(_estimate.matrix().topLeftCorner<3,3>());
+            std::cout << "C++ VertexD3VOFramePose size: " << pixel_inten.shape[0] << " " << pixel_inten.shape[1] << std::endl;
         }
-      }
 
-      //! wrapper function to use the old SE3 type
-      SE3Quat G2O_ATTRIBUTE_DEPRECATED(estimateAsSE3Quat() const) { return internal::toSE3Quat(estimate());}
-      //! wrapper function to use the old SE3 type
-      void G2O_ATTRIBUTE_DEPRECATED(setEstimateFromSE3Quat(const SE3Quat& se3)) { setEstimate(internal::fromSE3Quat(se3));}
+        virtual void setToOriginImpl() {
+            _estimate = Isometry3D::Identity();
+        }
+
+        virtual bool read(std::istream& is);
+        virtual bool write(std::ostream& os) const;
+
+        virtual bool setEstimateDataImpl(const double* est){
+            Eigen::Map<const Vector7d> v(est);
+            _estimate=internal::fromVectorQT(v);
+            return true;
+        }
+
+        virtual bool getEstimateData(double* est) const{
+            Eigen::Map<Vector7d> v(est);
+            v = internal::toVectorQT(_estimate);
+            return true;
+        }
+
+        virtual int estimateDimension() const {
+            return 7;
+        }
+
+        virtual bool setMinimalEstimateDataImpl(const double* est){
+            Eigen::Map<const Vector6d> v(est);
+            _estimate = internal::fromVectorMQT(v);
+            return true;
+        }
+
+        virtual bool getMinimalEstimateData(double* est) const{
+            Eigen::Map<Vector6d> v(est);
+            v = internal::toVectorMQT(_estimate);
+            return true;
+        }
+
+        virtual int minimalEstimateDimension() const {
+            return 6;
+        }
+
+        /**
+         * update the position of this vertex. The update is in the form
+         * (x,y,z,qx,qy,qz) whereas (x,y,z) represents the translational update
+         * and (qx,qy,qz) corresponds to the respective elements. The missing
+         * element qw of the quaternion is recovred by
+         * || (qw,qx,qy,qz) || == 1 => qw = sqrt(1 - || (qx,qy,qz) ||
+         */
+        virtual void oplusImpl(const double* update)
+        {
+            Eigen::Map<const Vector6d> v(update);
+            Isometry3D increment = internal::fromVectorMQT(v);
+            _estimate = _estimate * increment;
+            if (++_numOplusCalls > orthogonalizeAfter) {
+            _numOplusCalls = 0;
+            internal::approximateNearestOrthogonalMatrix(_estimate.matrix().topLeftCorner<3,3>());
+            }
+        }
+
+        //! wrapper function to use the old SE3 type
+        SE3Quat G2O_ATTRIBUTE_DEPRECATED(estimateAsSE3Quat() const) { return internal::toSE3Quat(estimate());}
+        //! wrapper function to use the old SE3 type
+        void G2O_ATTRIBUTE_DEPRECATED(setEstimateFromSE3Quat(const SE3Quat& se3)) { setEstimate(internal::fromSE3Quat(se3));}
 
     protected:
-      int _numOplusCalls;     ///< store how often opluse was called to trigger orthogonaliation of the rotation matrix
-  };
+        int _numOplusCalls;     ///< store how often opluse was called to trigger orthogonaliation of the rotation matrix
+ 
+};
 
 
 
