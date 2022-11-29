@@ -109,25 +109,6 @@ EdgeSE3Expmap::EdgeSE3Expmap() :
 
 
 
-// TODO 
-bool VertexD3VOPointDepth::read(std::istream& is) {
-  Vector7d est;
-  for (int i=0; i<7; i++)
-    is  >> est[i];
-//   SE3Quat cam2world;
-//   cam2world.fromVector(est);
-//   setEstimate(cam2world.inverse());
-  return true;
-}
-
-bool VertexD3VOPointDepth::write(std::ostream& os) const {
-//   SE3Quat cam2world(estimate().inverse());
-//   for (int i=0; i<7; i++)
-//     os << cam2world[i] << " ";
-  return os.good();
-}
-
-// TODO
 
 
 bool EdgeSE3Expmap::read(std::istream& is)  {
@@ -735,6 +716,50 @@ void EdgeProjectD3VO::linearizeOplus(){
 
 
 
+  VertexD3VOFramePose::VertexD3VOFramePose() : BaseVertex<6, Isometry3D>(), _numOplusCalls(0)
+  {
+    setToOriginImpl();
+    updateCache();
+  }
+
+  bool VertexD3VOFramePose::read(std::istream& is)
+  {
+    Vector7d est;
+    for (int i=0; i<7; i++)
+      is  >> est[i];
+    setEstimate(internal::fromVectorQT(est));
+    return true;
+  }
+
+  bool VertexD3VOFramePose::write(std::ostream& os) const
+  {
+    Vector7d est=internal::toVectorQT(_estimate);
+    for (int i=0; i<7; i++)
+      os << est[i] << " ";
+    return os.good();
+  }
+
+
+
+
+// TODO 
+bool VertexD3VOPointDepth::read(std::istream& is) {
+  Vector7d est;
+  for (int i=0; i<7; i++)
+    is  >> est[i];
+//   SE3Quat cam2world;
+//   cam2world.fromVector(est);
+//   setEstimate(cam2world.inverse());
+  return true;
+}
+
+bool VertexD3VOPointDepth::write(std::ostream& os) const {
+//   SE3Quat cam2world(estimate().inverse());
+//   for (int i=0; i<7; i++)
+//     os << cam2world[i] << " ";
+  return os.good();
+}
+// TODO
 
 
 

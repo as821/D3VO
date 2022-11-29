@@ -140,13 +140,23 @@ void declareD3VO(py::module & m) {
 
     py::class_<VertexD3VOPointDepth, BaseVertex<1, double>>(m, "VertexD3VOPointDepth")
         .def(py::init<const int, const int>())
-        //.def(py::init([]() {return new VertexSE3Expmap();}))
         .def("set_to_origin_impl", &VertexD3VOPointDepth::setToOriginImpl)
         .def("oplus_impl", &VertexD3VOPointDepth::oplusImpl)    // double* -> void
         .def("set_estimate", &VertexD3VOPointDepth::setEstimateDataImpl)
         .def("get_estimate", &VertexD3VOPointDepth::getEstimateData)
-        // read
-        // write
+    ;
+
+    py::class_<VertexD3VOFramePose, BaseVertex<6, Isometry3D>>(m, "VertexD3VOFramePose")
+        .def(py::init<>())
+
+        .def("set_to_origin_impl", &VertexD3VOFramePose::setToOriginImpl)
+        .def("set_estimate_data_impl", &VertexD3VOFramePose::setEstimateDataImpl)
+        .def("get_estimate_data", &VertexD3VOFramePose::getEstimateData)
+        .def("estimate_dimension", &VertexD3VOFramePose::estimateDimension)
+        .def("set_minimal_estimate_data_impl", &VertexD3VOFramePose::setMinimalEstimateDataImpl)
+        .def("get_minimal_estimate_data", &VertexD3VOFramePose::getMinimalEstimateData)
+        .def("minimal_estimate_dimension", &VertexD3VOFramePose::minimalEstimateDimension)
+        .def("oplus_impl", &VertexD3VOFramePose::oplusImpl)
     ;
 
 }
