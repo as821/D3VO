@@ -731,7 +731,8 @@ void EdgeProjectD3VO::linearizeOplus(){
     int X = dest_frame->pixel_inten.shape[0];
     int Y = dest_frame->pixel_inten.shape[1];
     int Z = host_frame->pixel_inten.shape[2];
-    Vector2D p_prime = cam->cam_map(dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate()));
+    Vector3D unprojected_X = dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate());
+    Vector2D p_prime = cam->cam_map(unprojected_X);
     int p_prime_u = (int) p_prime(0);
     int p_prime_v = (int) p_prime(1);
     
@@ -757,6 +758,29 @@ void EdgeProjectD3VO::linearizeOplus(){
     }
 
 
+    // TODO calculate Jacobian d p' / d depth --> a component in the Jacobian wrt the depth
+    // d p' / dX    (where X is the unprojected and rotated point in 3D space)
+    double depth = pt->estimate();
+    Eigen::Matrix<double,2,3> dprime_dX;
+    double focal_length = cam->focal_length; 
+    dprime_dX(0, 0) = focal_length / depth;
+    dprime_dX(0, 1) = 0;
+    dprime_dX(0, 2) = - focal_length * unprojected_X(0) / (depth * depth);
+    dprime_dX(1, 0) = focal_length / depth;
+    dprime_dX(1, 1) = 0;
+    dprime_dX(1, 2) = - focal_length * unprojected_X(1) / (depth * depth);
+
+    // d X / d depth
+    Vector3D unprojected = cam->cam_unmap(pt->uv, depth) / depth;
+    Vector3D dx_dd = unprojected_X / depth;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
+
+    // d p' / d depth
+    Vector2D dprime_ddepth = dprime_dX * dx_dd;
+
+    // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
+    Eigen::Matrix<double,1,1> J_depth = J_Ij.transpose() * dprime_ddepth;
+
+
     // TODO calculate Jacobian wrt T_i, T_j
 
 
@@ -768,10 +792,9 @@ void EdgeProjectD3VO::linearizeOplus(){
     int N = 1;      // Only processing a single point (eventually pattern of 8 as detailed in DSO)
     Eigen::Matrix<double,1,6> J_host_T;
     Eigen::Matrix<double,1,6> J_dest_T;
-    Eigen::Matrix<double,1,1> J_depth;
 
     for(int idx = 0; idx < N; idx++) {
-        J_depth(idx, 0) = 0;
+        // J_depth(idx, 0) = 0;
         for(int j = 0; j < 6; j++) {
             J_dest_T(idx, j) = 0;
             J_host_T(idx, j) = 0;

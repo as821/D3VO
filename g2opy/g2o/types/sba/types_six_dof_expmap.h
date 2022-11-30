@@ -380,6 +380,7 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
         }
 
         virtual void oplusImpl(const double* update_)  {
+            // std::cout << "VertexD3VOPointDepth oplusImpl update: (" << *update_ << ")" << std::endl;
             _estimate += (*update_);
         }
 
