@@ -482,7 +482,7 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D
                 _numOplusCalls = 0;
                 internal::approximateNearestOrthogonalMatrix(_estimate.matrix().topLeftCorner<3,3>());
             }
-            std::cout << "VertexD3VOFramePose oplusImpl update (1): (" << increment.matrix() << ")" << std::endl;
+            // std::cout << "VertexD3VOFramePose oplusImpl update (1): (" << increment.matrix() << ")" << std::endl;
         }
 
         //! wrapper function to use the old SE3 type

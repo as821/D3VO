@@ -731,7 +731,8 @@ void EdgeProjectD3VO::linearizeOplus(){
     int X = dest_frame->pixel_inten.shape[0];
     int Y = dest_frame->pixel_inten.shape[1];
     int Z = host_frame->pixel_inten.shape[2];
-    Vector3D unprojected_X = dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate());
+    Isometry3D T_host_dest = dest_frame->estimate() * host_frame->estimate().inverse();
+    Vector3D unprojected_X = T_host_dest * cam->cam_unmap(pt->uv, pt->estimate());
     Vector2D p_prime = cam->cam_map(unprojected_X);
     int p_prime_u = (int) p_prime(0);
     int p_prime_v = (int) p_prime(1);
@@ -757,9 +758,7 @@ void EdgeProjectD3VO::linearizeOplus(){
         J_Ij = Vector2D(0, 0);
     }
 
-
-    // TODO calculate Jacobian d p' / d depth --> a component in the Jacobian wrt the depth
-    // d p' / dX    (where X is the unprojected and rotated point in 3D space)
+    // d p' / dX   (where X is the unprojected and rotated point in 3D space)
     double depth = pt->estimate();
     Eigen::Matrix<double,2,3> dprime_dX;
     double focal_length = cam->focal_length; 
@@ -780,26 +779,68 @@ void EdgeProjectD3VO::linearizeOplus(){
     // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
     Eigen::Matrix<double,1,1> J_depth = J_Ij.transpose() * dprime_ddepth;
 
+    // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
+    // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
+    Eigen::Matrix<double,3,6> dX_drelative;
+    // TODO(as) check that this linear/angular velocity ordering is correct !!
+    // eye(3) in left half of matrix --> twist coordinate state vector is (linear velocity, angular velocity)
+    dX_drelative(0, 0) = 1;     
+    dX_drelative(0, 1) = 0;
+    dX_drelative(0, 2) = 0;
+    dX_drelative(1, 0) = 1;
+    dX_drelative(1, 1) = 1;
+    dX_drelative(1, 2) = 0;
+    dX_drelative(2, 0) = 0;
+    dX_drelative(2, 1) = 0;
+    dX_drelative(2, 2) = 1;
 
-    // TODO calculate Jacobian wrt T_i, T_j
+    // in left half of matrix, negative cross product of the projected and rotated point
+    dX_drelative(0, 3) = 0;   
+    dX_drelative(0, 4) = unprojected_X(2);
+    dX_drelative(0, 5) = unprojected_X(1);
+    dX_drelative(1, 3) = -unprojected_X(2);
+    dX_drelative(1, 4) = 0;
+    dX_drelative(1, 5) = unprojected_X(0);
+    dX_drelative(2, 3) = unprojected_X(1);
+    dX_drelative(2, 4) = -unprojected_X(0);
+    dX_drelative(2, 5) = 0;
+
+    // d X / d (T_j * T_i^{-1})
+    Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
 
 
-    // TODO combine components to generate Jacobian
-    // _jacobianOplus = J_Ij * J_geo;
-    
-    
-    // TODO zero all Jacobians for now ==> should make the optimizer do nothing!!    
-    int N = 1;      // Only processing a single point (eventually pattern of 8 as detailed in DSO)
-    Eigen::Matrix<double,1,6> J_host_T;
-    Eigen::Matrix<double,1,6> J_dest_T;
+    // Separate this relative pose Jacobian (T_j * T_i^{-1}) into Jacobians for T_i and T_j using the adjoint transformation
+    // https://ethaneade.com/lie.pdf (pg4/5)
+    // https://www.cnblogs.com/JingeTU/p/8306727.html 
+    // https://www.ethaneade.com/latex2html/lie/node17.html --> Adjoint of a matrix in SE(3)
+    Eigen::Matrix<double, 3, 3> R_th = T_host_dest.rotation().matrix();  
+    Eigen::Matrix<double, 1, 3> t_th = T_host_dest.translation();
+    Eigen::Matrix<double, 3, 3> cross_t_th;     // Eigen has no unary cross product operator??
+    cross_t_th(0, 0) = 0; 
+    cross_t_th(0, 1) = -t_th(2); 
+    cross_t_th(0, 2) = t_th(1); 
+    cross_t_th(1, 0) = t_th(2); 
+    cross_t_th(1, 1) = 0; 
+    cross_t_th(1, 2) = -t_th(0); 
+    cross_t_th(2, 0) = -t_th(1); 
+    cross_t_th(2, 1) = t_th(0); 
+    cross_t_th(2, 2) = 0; 
+    Eigen::Matrix<double, 3, 3> zero;
+    zero.setZero();
 
-    for(int idx = 0; idx < N; idx++) {
-        // J_depth(idx, 0) = 0;
-        for(int j = 0; j < 6; j++) {
-            J_dest_T(idx, j) = 0;
-            J_host_T(idx, j) = 0;
-        }
-    }
+    // Assemble Ad_{T_{th}}
+    Eigen::Matrix<double,6,6> host_adjoint;
+    host_adjoint << R_th, cross_t_th * R_th,
+                    zero, R_th;
+
+    // Calculate separated Jacobians for host and target frames
+    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose * -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
+    Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;   // adjoint of target frame is the identity
+
+    // Calculate full host and target frame Jacobians by incorporating image pixel gradients
+    Eigen::Matrix<double,1,6> J_host_T = J_Ij.transpose() * J_host_p_prime;
+    Eigen::Matrix<double,1,6> J_dest_T = J_Ij.transpose() * J_dest_p_prime;
 
     // Order of these Jacobians is the same as the order of _vertices (depth, dest frame, host frame)
     _jacobianOplus[0] = J_depth;
