@@ -662,63 +662,57 @@ void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
 
 
 bool EdgeProjectD3VO::write(std::ostream& os) const  {
-    os << _cam->id() << " ";
-    for (int i=0; i<2; i++){
-        os << measurement()[i] << " ";
-    }
+    // os << _cam->id() << " ";
+    // for (int i=0; i<2; i++){
+    //     os << measurement()[i] << " ";
+    // }
 
-    for (int i=0; i<2; i++)
-        for (int j=i; j<2; j++){
-        os << " " <<  information()(i,j);
-        }
+    // for (int i=0; i<2; i++)
+    //     for (int j=i; j<2; j++){
+    //     os << " " <<  information()(i,j);
+    //     }
     return os.good();
 }
 
 bool EdgeProjectD3VO::read(std::istream& is) {
-    int paramId;
-    is >> paramId;
-    setParameterId(0, paramId);
+    // int paramId;
+    // is >> paramId;
+    // setParameterId(0, paramId);
 
-    for (int i=0; i<2; i++){
-        is >> _measurement[i];
-    }
-    for (int i=0; i<2; i++)
-        for (int j=i; j<2; j++) {
-        is >> information()(i,j);
-        if (i!=j)
-            information()(j,i)=information()(i,j);
-        }
+    // for (int i=0; i<2; i++){
+    //     is >> _measurement[i];
+    // }
+    // for (int i=0; i<2; i++)
+    //     for (int j=i; j<2; j++) {
+    //     is >> information()(i,j);
+    //     if (i!=j)
+    //         information()(j,i)=information()(i,j);
+    //     }
     return true;
 }
 
 void EdgeProjectD3VO::computeError(){
-    /*
-    const VertexSBAPointXYZ * psi = static_cast<const VertexSBAPointXYZ*>(_vertices[0]);
-    const VertexSE3Expmap * T_p_from_world = static_cast<const VertexSE3Expmap*>(_vertices[1]);
-    const VertexSE3Expmap * T_anchor_from_world = static_cast<const VertexSE3Expmap*>(_vertices[2]);
-    const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
-
-    Vector2D obs(_measurement);
-    _error = obs - cam->cam_map(T_p_from_world->estimate()
-            *T_anchor_from_world->estimate().inverse()
-            *invert_depth(psi->estimate()));
-    */
-
     const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
     const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
     const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
     const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
 
-    // Vector2D obs(_measurement); 
-
-
-    //_error = obs - cam->cam_map(T_p_from_world->estimate() * T_anchor_from_world->estimate().inverse() * invert_depth(psi->estimate()));
-
-    // T_j_i = dest_frame.estimate() * anchor_frame.estimate().inverse();
     Vector2D p_prime = cam->cam_map(dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate()));
 
-    // TODO need to store pixel intensities in the FramePose objects
-    // _error = 0;
+    // Obtain pixel intensity for host and destination frames for points p and p'
+    double* host_img = (double*) host_frame->pixel_inten.ptr;
+    double* dest_img = (double*) dest_frame->pixel_inten.ptr;
+
+    // Have to index into array manually...
+    int X = host_frame->pixel_inten.shape[0];
+    int Y = host_frame->pixel_inten.shape[1];
+    int Z = host_frame->pixel_inten.shape[2];
+    int host_base_idx = (int)pt->uv(0) * Y * Z + Z * (int)pt->uv(1);
+    int dest_base_idx = (int)p_prime(0) * Y * Z + Z * (int)p_prime(1);
+
+    Vector3D host_inten(host_img[host_base_idx], host_img[host_base_idx+1], host_img[host_base_idx+2]);
+    Vector3D dest_inten(dest_img[dest_base_idx], dest_img[dest_base_idx+1], dest_img[dest_base_idx+2]);
+    _error = dest_inten - host_inten;
 }
 
 void EdgeProjectD3VO::linearizeOplus(){

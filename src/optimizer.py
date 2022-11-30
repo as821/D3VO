@@ -66,13 +66,12 @@ class Map:
 		# set up point edges between frames and depths
 		for p in self.points:
 			# setup vertex for depth estimate
-			pt = g2o.VertexD3VOPointDepth(0, 0)
+			host_frame, host_uv_coord = p.get_host_frame()
+			pt = g2o.VertexD3VOPointDepth(host_uv_coord[0], host_uv_coord[1])
 			pt.set_id(p.id * 2 + 1)		# odd IDs, no collisions with frame ID
 
 			# unproject point with depth estimate onto 3D world using the host frame depth estimate
-			host_frame, host_uv_coord = p.get_host_frame()
 			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
-			#est = unproject(host_uv_coord, host_depth_est, intrinsic)
 			pt.set_estimate(host_depth_est)			
 			
 			pt.set_fixed(False)
@@ -91,10 +90,10 @@ class Map:
 				#inten = f.image[uv_coord[1], uv_coord[0]]
 				#edge.set_measurement(inten)		# measurement is host frame pixel intensity (u/v coordinate swap)
 				
-				# TODO this seems incorrect
-				edge.set_measurement(uv_coord)
+				# TODO this seems incorrect --> no need for measurements with this edge, all photometric info (pixel intensity) is already available in the frame objects
+				# edge.set_measurement(uv_coord)
 				
-				edge.set_information(np.eye(2))								# simplified setting, no weights so use identity
+				edge.set_information(np.eye(3))								# simplified setting, no weights so use identity
 				edge.set_robust_kernel(g2o.RobustKernelHuber())
 				edge.set_parameter_id(0, 0)
 				opt.add_edge(edge)

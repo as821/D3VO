@@ -16,8 +16,8 @@ def extract_features(img):
 	kps = [cv2.KeyPoint(x=f[0][0], y=f[0][1], size=20) for f in pts]
 	kps, des = orb.compute(img, kps)
 
-	# return pts and des
-	return np.array([(int(kp.pt[0]), int(kp.pt[1])) for kp in kps]), des
+	# return pts and des --> fix index ordering to match image/depth/uncertainty map orientation (long horizontal, short vertical dimension)
+	return np.array([(int(kp.pt[1]), int(kp.pt[0])) for kp in kps]), des
 
 
 def match_frame_kps(f1, f2):
@@ -83,6 +83,9 @@ class Frame:
 
 		# Run frontend keypoint extractor
 		self.kps, self.des = extract_features(image)
+
+		# Ensure that u/v coordinates of keypoints match the image/depth/uncertainty dimension shape (catch these issues at the source!)
+		assert all([p[0] >= 0 and p[0] <= self.image.shape[0] and p[1] >= 0 and p[1] <= self.image.shape[1] for p in self.kps])
 		self.pts = {}                       # map kps/des list index to corresponding Point object   
 
 

@@ -132,7 +132,7 @@ void declareTypesSixDofExpmap(py::module & m) {
 
 
 void declareD3VO(py::module & m) {
-    py::class_<EdgeProjectD3VO, BaseMultiEdge<2, Vector2D>>(m, "EdgeProjectD3VO")
+    py::class_<EdgeProjectD3VO, BaseMultiEdge<3, Vector3D>>(m, "EdgeProjectD3VO")
         .def(py::init())
         .def("compute_error", &EdgeProjectD3VO::computeError)
         .def("linearize_oplus", &EdgeProjectD3VO::linearizeOplus)

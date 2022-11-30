@@ -342,7 +342,7 @@ class EdgeStereoSE3ProjectXYZOnlyPose : public BaseUnaryEdge<3, Vector3D, Vertex
 
 
 // 3-way edge between two Frames and a Point
-class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D>
+class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D>
 {
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -352,10 +352,10 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<2, Vector2D
             installParameter(_cam, 0);
         }
 
-        virtual bool read  (std::istream& is);
-        virtual bool write (std::ostream& os) const;
-        void computeError  ();
-        virtual void linearizeOplus ();
+        virtual bool read(std::istream& is);
+        virtual bool write(std::ostream& os) const;
+        void computeError();
+        virtual void linearizeOplus();
         CameraParameters * _cam;
 };
 
@@ -425,7 +425,7 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D
             // Process + store input numpy array
             pixel_inten = pixel_intensity.request();
 
-            std::cout << "C++ VertexD3VOFramePose size: " << pixel_inten.shape[0] << " " << pixel_inten.shape[1] << std::endl;
+            std::cout << "C++ VertexD3VOFramePose size: " << pixel_inten.shape[0] << " " << pixel_inten.shape[1] << " " << pixel_inten.shape[2] << std::endl;
         }
 
         virtual void setToOriginImpl() {
