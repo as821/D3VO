@@ -715,22 +715,80 @@ void EdgeProjectD3VO::computeError(){
     _error = dest_inten - host_inten;
 }
 
-void EdgeProjectD3VO::linearizeOplus(){
-    VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
-    Vector3D psi_a = vpoint->estimate();
-    VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
-    SE3Quat T_cw = vpose->estimate();
-    VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
-    const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
 
-    SE3Quat A_aw = vanchor->estimate();
-    SE3Quat T_ca = T_cw*A_aw.inverse();
-    Vector3D x_a = invert_depth(psi_a);
-    Vector3D y = T_ca*x_a;
-    Matrix<double,2,3,Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
-    _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
-    _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
-    _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
+
+void EdgeProjectD3VO::linearizeOplus(){
+    // VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
+    // Vector3D psi_a = vpoint->estimate();
+    // VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
+    // SE3Quat T_cw = vpose->estimate();
+    // VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
+    // const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
+
+    // SE3Quat A_aw = vanchor->estimate();
+    // SE3Quat T_ca = T_cw*A_aw.inverse();
+    // Vector3D x_a = invert_depth(psi_a);
+    // Vector3D y = T_ca*x_a;
+    // Matrix<double,2,3,Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
+    // _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
+    // _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
+    // _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
+
+    const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
+    const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
+    const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
+    const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
+
+    // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
+    // State should have 7 components --> 6 for each pose, 1 for the point ==> state vector \in R^13
+    const int state_vec_dim = 2; // 13; --> this has no real meaning, still trying to understand _jacobianOplus (just get things working)
+
+    // J_k = [J_I * J_{geo}]     // No photometric components, we learn these with PoseNet. J_geo is just gradients wrt T_i and T_j
+
+
+    // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p')) at given point
+    int X = dest_frame->pixel_inten.shape[0];
+    int Y = dest_frame->pixel_inten.shape[1];
+    int Z = host_frame->pixel_inten.shape[2];
+    Vector2D p_prime = cam->cam_map(dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate()));
+    int p_prime_u = (int) p_prime(0);
+    int p_prime_v = (int) p_prime(1);
+    
+    // Validate point not near the edge of the image
+    Vector2D J_Ij;
+    if(p_prime_u + 1 <= X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 <= Y) {
+        // Note: top left of image is (0, 0)
+        double* dest_img = (double*) dest_frame->pixel_inten.ptr;
+        int dest_base_idx = p_prime_u * Y * Z + Z * p_prime_v;
+        double dx_r = dest_img[dest_base_idx + Z] - dest_img[dest_base_idx - Z];        // right - left;
+        double dy_r = dest_img[dest_base_idx + Y*Z] - dest_img[dest_base_idx - Y*Z];    // bottom - top;
+        double dx_g = dest_img[dest_base_idx + Z + 1] - dest_img[dest_base_idx - Z + 1];  
+        double dy_g = dest_img[dest_base_idx + Y*Z + 1] - dest_img[dest_base_idx - Y*Z + 1];   
+        double dx_b = dest_img[dest_base_idx + Z + 2] - dest_img[dest_base_idx - Z + 2]; 
+        double dy_b = dest_img[dest_base_idx + Y*Z + 2] - dest_img[dest_base_idx - Y*Z + 2];  
+
+        // Gradient of RGB image is not well-defined, just take the average over gradients from all channels
+        J_Ij = Vector2D((dx_r + dx_g + dx_b) / 3, (dy_r + dy_g + dy_b) / 3);
+    }
+    else {
+        // Point on the edge of the image, cannot calculate image gradient
+        J_Ij = Vector2D(0, 0);
+    }
+
+
+    // TODO calculate Jacobian wrt T_i, T_j
+
+
+    // TODO combine components to generate Jacobian
+    // _jacobianOplus = J_Ij * J_geo;
+    
+    
+    // TODO zero out Jacobian for now ==> should make the optimizer do nothing!!    
+    for(int i = 0; i < state_vec_dim; i++) {
+        Matrix<double,2,3,Eigen::ColMajor> J;
+        J << 0, 0, 0, 0, 0, 0;
+        _jacobianOplus[i] = J;
+    }
 }
 
 
