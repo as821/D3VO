@@ -718,35 +718,16 @@ void EdgeProjectD3VO::computeError(){
 
 
 void EdgeProjectD3VO::linearizeOplus(){
-    // VertexSBAPointXYZ* vpoint = static_cast<VertexSBAPointXYZ*>(_vertices[0]);
-    // Vector3D psi_a = vpoint->estimate();
-    // VertexSE3Expmap * vpose = static_cast<VertexSE3Expmap *>(_vertices[1]);
-    // SE3Quat T_cw = vpose->estimate();
-    // VertexSE3Expmap * vanchor = static_cast<VertexSE3Expmap *>(_vertices[2]);
-    // const CameraParameters * cam = static_cast<const CameraParameters *>(parameter(0));
-
-    // SE3Quat A_aw = vanchor->estimate();
-    // SE3Quat T_ca = T_cw*A_aw.inverse();
-    // Vector3D x_a = invert_depth(psi_a);
-    // Vector3D y = T_ca*x_a;
-    // Matrix<double,2,3,Eigen::ColMajor> Jcam = d_proj_d_y(cam->focal_length, y);
-    // _jacobianOplus[0] = -Jcam*d_Tinvpsi_d_psi(T_ca, psi_a);
-    // _jacobianOplus[1] = -Jcam*d_expy_d_y(y);
-    // _jacobianOplus[2] = Jcam*T_ca.rotation().toRotationMatrix()*d_expy_d_y(x_a);
-
     const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
     const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
     const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
     const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
 
     // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
-    // State should have 7 components --> 6 for each pose, 1 for the point ==> state vector \in R^13
-    const int state_vec_dim = 2; // 13; --> this has no real meaning, still trying to understand _jacobianOplus (just get things working)
-
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
     // J_k = [J_I * J_{geo}]     // No photometric components, we learn these with PoseNet. J_geo is just gradients wrt T_i and T_j
 
-
-    // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p')) at given point
+    // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p'))
     int X = dest_frame->pixel_inten.shape[0];
     int Y = dest_frame->pixel_inten.shape[1];
     int Z = host_frame->pixel_inten.shape[2];
@@ -783,12 +764,24 @@ void EdgeProjectD3VO::linearizeOplus(){
     // _jacobianOplus = J_Ij * J_geo;
     
     
-    // TODO zero out Jacobian for now ==> should make the optimizer do nothing!!    
-    for(int i = 0; i < state_vec_dim; i++) {
-        Matrix<double,2,3,Eigen::ColMajor> J;
-        J << 0, 0, 0, 0, 0, 0;
-        _jacobianOplus[i] = J;
+    // TODO zero all Jacobians for now ==> should make the optimizer do nothing!!    
+    int N = 1;      // Only processing a single point (eventually pattern of 8 as detailed in DSO)
+    Eigen::Matrix<double,1,6> J_host_T;
+    Eigen::Matrix<double,1,6> J_dest_T;
+    Eigen::Matrix<double,1,1> J_depth;
+
+    for(int idx = 0; idx < N; idx++) {
+        J_depth(idx, 0) = 0;
+        for(int j = 0; j < 6; j++) {
+            J_dest_T(idx, j) = 0;
+            J_host_T(idx, j) = 0;
+        }
     }
+
+    // Order of these Jacobians is the same as the order of _vertices (depth, dest frame, host frame)
+    _jacobianOplus[0] = J_depth;
+    _jacobianOplus[1] = J_dest_T;
+    _jacobianOplus[2] = J_host_T;
 }
 
 
