@@ -86,12 +86,6 @@ class Map:
 				edge.set_vertex(0, pt)										# connect to depth estimate
 				edge.set_vertex(1, opt_frames[host_frame])					# connect to host frame
 				edge.set_vertex(2, opt_frames[f])							# connect to frame where point was observed
-				uv_coord = f.kps[p.idxs[idx]]
-				#inten = f.image[uv_coord[1], uv_coord[0]]
-				#edge.set_measurement(inten)		# measurement is host frame pixel intensity (u/v coordinate swap)
-				
-				# TODO this seems incorrect --> no need for measurements with this edge, all photometric info (pixel intensity) is already available in the frame objects
-				# edge.set_measurement(uv_coord)
 				
 				edge.set_information(np.eye(3))								# simplified setting, no weights so use identity
 				edge.set_robust_kernel(g2o.RobustKernelHuber())
@@ -115,7 +109,7 @@ class Map:
 			f.pose = np.eye(4)
 			f.pose[:3, :3] = est.rotation().matrix()
 			f.pose[:3, 3] = est.translation()
-			print(f.pose)
+			#print(f.pose)
 		return
 		
 
