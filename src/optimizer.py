@@ -1,4 +1,4 @@
-from frontend import Point, Frame
+from frontend import Point, Frame, match_frame_kps
 from helper import project, unproject
 
 import numpy as np
@@ -8,15 +8,89 @@ import g2o
 
 class Map:
 	"""Class to store and optimize over all current frames, points, etc."""
-	def __init__(self):
+	def __init__(self, N_f=7):
 		self.frames = []
+		self.key_frames = []
 		self.points = []
 		self.frame_idx = self.pt_idx = 0
+		self.N_f = N_f
 
-	def add_frame(self, frame):
+	def set_N_f(self, N_f):
+		self.N_f = N_f
+
+	def check_key_frame(self, frame, instrinsics):
+		last_key_frame = self.frames[-1]
+		w_a = 0.0
+		w_f = 0.6
+		w_ft = 0.4
+		assert(w_a + w_f + w_ft == 1)
+		l1, l2 = match_frame_kps(last_key_frame, frame)
+
+		# Compute homography to wrap points just for translation
+		# Camera projection is given by x = K[R | Rt]X where
+		# K[R | Rt] is the pose for the camera.
+		# We find the rotation for camera by multiplying with inverse
+		# of the intrinsic and taking just the first 3 rows and first 3
+		# columns.
+		# The homography is then given by R1 @ inv(R2) @ inv(K)
+		R1 = (np.linalg.inv(instrinsics) @ last_key_frame.pose)[:3, :3]
+		R2 = (np.linalg.inv(instrinsics) @ frame.pose)[:3, :3]
+		homography_t = instrinsics @ R1 @ np.linalg.inv(R2) @ np.linalg.inv(instrinsics)
+
+		f = 0
+		ft = 0
+		a = 0
+
+		for idx1, idx2 in zip(l1, l2):
+			x1, y1 = last_key_frame.kps[idx1].pt
+			x2, y2 = frame.kps[idx2].pt
+			f += (x1 - x2) ** 2 + (y1 - y2) ** 2
+			pt = homography_t @ np.array([x2, y2, 1]).reshape(3, 1)
+			x_pt = pt[0] / pt[-1]
+			y_pt = pt[1] / pt[-1]
+
+			ft += (x1 - x_pt) ** 2 + (y1 - y_pt) ** 2
+
+		f /= len(l1)
+		f = np.sqrt(f)
+		ft /= len(l1)
+		ft = np.sqrt(ft)
+
+		return (w_f * f + w_ft * ft + w_a * a) > 1
+
+	def marginalize(self):
+		latest_key_frame = self.key_frames[-1]
+		max_dist = 0
+		max_dist_idx = 0
+		marginalized_count = 0
+
+		# Can marginalize everything apart from the last two keyframes:
+		for i in range(len(self.key_frames) - 1):
+			l1, l2 = match_frame_kps(last_key_frame, self.key_frames[i])
+			if len(l2) / len(self.key_frames[i].kps) < 0.1:
+				self.key_frames[i].marginalize = True
+				marginalized_count += 1
+			frame_dist = np.linalg.norm(latest_key_frame - self.key_frames[i])
+			if frame_dist > max_dist:
+				max_dist = frame_dist
+				max_dist_idx = i
+
+		if len(self.key_frames) > self.N_f and marginalized_count == 0:
+			self.key_frames[max_dist_idx].marginalize = True
+
+	def add_frame(self, frame, instrinsics):
 		"""Add a Frame to the Map"""
 		# TODO assumes no frame removal in ID assignment
 		assert (type(frame) == Frame)
+		if len(self.frames) > 0:
+			key_frame = self.check_key_frame(frame, instrinsics)
+		else:
+			key_frame = True
+
+		if key_frame:
+			self.key_frames.append(frame)
+			self.marginalize()
+
 		ret = self.frame_idx
 		self.frame_idx += 1
 		self.frames.append(frame)
