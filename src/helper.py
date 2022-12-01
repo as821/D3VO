@@ -95,4 +95,3 @@ def compute_ate(gtruth_xyz, pred_xyz_o):
     alignment_error = pred_xyz * scale - gtruth_xyz
     rmse = np.sqrt(np.sum(alignment_error ** 2)) / gtruth_xyz.shape[0]
     return rmse
-
