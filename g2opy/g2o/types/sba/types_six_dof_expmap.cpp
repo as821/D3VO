@@ -760,14 +760,7 @@ void EdgeProjectD3VO::linearizeOplus(){
 
     // d p' / dX   (where X is the unprojected and rotated point in 3D space)
     double depth = pt->estimate();
-    Eigen::Matrix<double,2,3> dprime_dX;
-    double focal_length = cam->focal_length; 
-    dprime_dX(0, 0) = focal_length / depth;
-    dprime_dX(0, 1) = 0;
-    dprime_dX(0, 2) = - focal_length * unprojected_X(0) / (depth * depth);
-    dprime_dX(1, 0) = focal_length / depth;
-    dprime_dX(1, 1) = 0;
-    dprime_dX(1, 2) = - focal_length * unprojected_X(1) / (depth * depth);
+    Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
 
     // d X / d depth
     Vector3D unprojected = cam->cam_unmap(pt->uv, depth) / depth;
@@ -782,29 +775,9 @@ void EdgeProjectD3VO::linearizeOplus(){
     // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
     // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
+    // twist coordinate state vector is (linear velocity, angular velocity). in left half of matrix, negative cross product of the projected and rotated point
     Eigen::Matrix<double,3,6> dX_drelative;
-    // TODO(as) check that this linear/angular velocity ordering is correct !!
-    // eye(3) in left half of matrix --> twist coordinate state vector is (linear velocity, angular velocity)
-    dX_drelative(0, 0) = 1;     
-    dX_drelative(0, 1) = 0;
-    dX_drelative(0, 2) = 0;
-    dX_drelative(1, 0) = 1;
-    dX_drelative(1, 1) = 1;
-    dX_drelative(1, 2) = 0;
-    dX_drelative(2, 0) = 0;
-    dX_drelative(2, 1) = 0;
-    dX_drelative(2, 2) = 1;
-
-    // in left half of matrix, negative cross product of the projected and rotated point
-    dX_drelative(0, 3) = 0;   
-    dX_drelative(0, 4) = unprojected_X(2);
-    dX_drelative(0, 5) = unprojected_X(1);
-    dX_drelative(1, 3) = -unprojected_X(2);
-    dX_drelative(1, 4) = 0;
-    dX_drelative(1, 5) = unprojected_X(0);
-    dX_drelative(2, 3) = unprojected_X(1);
-    dX_drelative(2, 4) = -unprojected_X(0);
-    dX_drelative(2, 5) = 0;
+    dX_drelative << Eigen::Matrix<double,3,3>::Identity(), -skew(unprojected_X);
 
     // d X / d (T_j * T_i^{-1})
     Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
@@ -816,16 +789,7 @@ void EdgeProjectD3VO::linearizeOplus(){
     // https://www.ethaneade.com/latex2html/lie/node17.html --> Adjoint of a matrix in SE(3)
     Eigen::Matrix<double, 3, 3> R_th = T_host_dest.rotation().matrix();  
     Eigen::Matrix<double, 1, 3> t_th = T_host_dest.translation();
-    Eigen::Matrix<double, 3, 3> cross_t_th;     // Eigen has no unary cross product operator??
-    cross_t_th(0, 0) = 0; 
-    cross_t_th(0, 1) = -t_th(2); 
-    cross_t_th(0, 2) = t_th(1); 
-    cross_t_th(1, 0) = t_th(2); 
-    cross_t_th(1, 1) = 0; 
-    cross_t_th(1, 2) = -t_th(0); 
-    cross_t_th(2, 0) = -t_th(1); 
-    cross_t_th(2, 1) = t_th(0); 
-    cross_t_th(2, 2) = 0; 
+    Eigen::Matrix<double, 3, 3> cross_t_th = skew(t_th);     // Eigen has no unary cross product operator??
     Eigen::Matrix<double, 3, 3> zero;
     zero.setZero();
 

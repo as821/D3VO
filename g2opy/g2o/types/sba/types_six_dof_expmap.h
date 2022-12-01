@@ -475,6 +475,10 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D
          */
         virtual void oplusImpl(const double* update)
         {
+
+            // TODO check order in which estimate is represented by Isometry3D (linear then angular velocity)
+            // TODO check that we are apply this update correctly, do we need to apply an exponential/log map??
+
             Eigen::Map<const Vector6d> v(update);
             Isometry3D increment = internal::fromVectorMQT(v);
             _estimate = _estimate * increment;
