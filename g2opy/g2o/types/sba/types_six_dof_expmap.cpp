@@ -775,9 +775,7 @@ void EdgeProjectD3VO::linearizeOplus(){
     // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
     // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
-    // twist coordinate state vector is (linear velocity, angular velocity). in left half of matrix, negative cross product of the projected and rotated point
-    Eigen::Matrix<double,3,6> dX_drelative;
-    dX_drelative << Eigen::Matrix<double,3,3>::Identity(), -skew(unprojected_X);
+    Eigen::Matrix<double,3,6> dX_drelative = d_expy_d_y(unprojected_X);
 
     // d X / d (T_j * T_i^{-1})
     Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
