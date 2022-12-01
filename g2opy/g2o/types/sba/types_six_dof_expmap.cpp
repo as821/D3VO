@@ -710,6 +710,15 @@ void EdgeProjectD3VO::computeError(){
     int host_base_idx = (int)pt->uv(0) * Y * Z + Z * (int)pt->uv(1);
     int dest_base_idx = (int)p_prime(0) * Y * Z + Z * (int)p_prime(1);
 
+    if(host_base_idx + 2 >= X*Y*Z || dest_base_idx + 2 >= X*Y*Z || host_base_idx < 0 || dest_base_idx < 0) {
+        _error.setZero();
+        out_of_bounds = true;
+        return;
+    }
+    else{
+        out_of_bounds = false;
+    }
+
     Vector3D host_inten(host_img[host_base_idx], host_img[host_base_idx+1], host_img[host_base_idx+2]);
     Vector3D dest_inten(dest_img[dest_base_idx], dest_img[dest_base_idx+1], dest_img[dest_base_idx+2]);
     _error = dest_inten - host_inten;
@@ -718,6 +727,19 @@ void EdgeProjectD3VO::computeError(){
 
 
 void EdgeProjectD3VO::linearizeOplus(){
+    if(out_of_bounds) {
+        // Out of bounds reprojection detected, cause optimizer to ignore this edge
+        Eigen::Matrix<double,1,6> frame_error;
+        Eigen::Matrix<double,1,1> depth_error;
+        depth_error.setZero();
+        frame_error.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error;
+        _jacobianOplus[2] = frame_error;
+        out_of_bounds = false;
+        return;
+    }
+    
     const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
     const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
     const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
@@ -739,7 +761,7 @@ void EdgeProjectD3VO::linearizeOplus(){
     
     // Validate point not near the edge of the image
     Vector2D J_Ij;
-    if(p_prime_u + 1 <= X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 <= Y) {
+    if(p_prime_u + 1 < X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 < Y) {
         // Note: top left of image is (0, 0)
         double* dest_img = (double*) dest_frame->pixel_inten.ptr;
         int dest_base_idx = p_prime_u * Y * Z + Z * p_prime_v;
@@ -754,8 +776,15 @@ void EdgeProjectD3VO::linearizeOplus(){
         J_Ij = Vector2D((dx_r + dx_g + dx_b) / 3, (dy_r + dy_g + dy_b) / 3);
     }
     else {
-        // Point on the edge of the image, cannot calculate image gradient
-        J_Ij = Vector2D(0, 0);
+        // Out of bounds reprojection detected / failure to calculate image gradient, cause optimizer to ignore this edge
+        Eigen::Matrix<double,1,6> frame_error;
+        Eigen::Matrix<double,1,1> depth_error;
+        depth_error.setZero();
+        frame_error.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error;
+        _jacobianOplus[2] = frame_error;
+        return;
     }
 
     // d p' / dX   (where X is the unprojected and rotated point in 3D space)
@@ -779,7 +808,6 @@ void EdgeProjectD3VO::linearizeOplus(){
 
     // d X / d (T_j * T_i^{-1})
     Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
-
 
     // Separate this relative pose Jacobian (T_j * T_i^{-1}) into Jacobians for T_i and T_j using the adjoint transformation
     // https://ethaneade.com/lie.pdf (pg4/5)

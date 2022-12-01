@@ -65,7 +65,7 @@ namespace csparse_extension {
     n = A->n ;
     N = cs_chol_workspace (A, S, work, x) ;                    /* numeric Cholesky factorization */
     if (!N) {
-      fprintf(stderr, "%s: cholesky failed!\n", __PRETTY_FUNCTION__);
+      // fprintf(stderr, "%s: cholesky failed!\n", __PRETTY_FUNCTION__);
       /*assert(0);*/
     }
     ok = (N != NULL) ;

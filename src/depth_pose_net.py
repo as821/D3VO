@@ -107,7 +107,7 @@ class Networks():
             plt.plot(mn_coord[0], mn_coord[1], marker="o", markersize=10, markeredgecolor="red", markerfacecolor="red")
 
         # Return as numpy array (self.width, self.heights)
-        return depth_resized.T
+        return depth_resized
 
 
     def pose(self, img1, img2):

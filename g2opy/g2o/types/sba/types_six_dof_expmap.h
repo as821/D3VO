@@ -350,6 +350,7 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
         EdgeProjectD3VO()  {
             resizeParameters(1);
             installParameter(_cam, 0);
+            out_of_bounds = false;
         }
 
         virtual bool read(std::istream& is);
@@ -357,6 +358,7 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
         void computeError();
         virtual void linearizeOplus();
         CameraParameters * _cam;
+        bool out_of_bounds;
 };
 
 
@@ -386,6 +388,7 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
 
         virtual bool setEstimateDataImpl(const double* est){
             _estimate = *est;
+            // std::cout << "setting (" << uv(0) << ", "<< uv(1) << ") estimate to: " << *est << std::endl;
             return true;
         }
 
@@ -425,6 +428,7 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, Isometry3D
 
             // Process + store input numpy array
             pixel_inten = pixel_intensity.request();
+            // std::cout << "Frame dim: (" <<  pixel_inten.shape[0] << ", " << pixel_inten.shape[1] << ", " << pixel_inten.shape[2] << ")" << std::endl;
         }
 
         virtual void setToOriginImpl() {

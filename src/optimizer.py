@@ -31,14 +31,14 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=10):
+	def optimize(self, intrinsic, iter=6, verbose=False):
 		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
 		solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
 		solver = g2o.OptimizationAlgorithmLevenberg(solver)
 		opt.set_algorithm(solver)
-		opt.set_verbose(True)
+		opt.set_verbose(verbose)
 
 		opt_frames, opt_pts = {}, {}
 	
