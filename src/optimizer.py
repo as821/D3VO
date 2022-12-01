@@ -31,7 +31,7 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=6, verbose=False):
+	def optimize(self, intrinsic, iter=6, verbose=True):
 		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
 		# create optimizer (TODO just following example, likely incorrect for D3VO)
 		opt = g2o.SparseOptimizer()
@@ -56,7 +56,7 @@ class Map:
 		for f in self.frames:
 			# add frame to the optimization graph as an SE(3) pose
 			v_se3 = g2o.VertexD3VOFramePose(f.image)
-			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]).Isometry3d()) 	# use frame pose estimate as initialization
+			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3])) 	# .Isometry3d() use frame pose estimate as initialization
 			v_se3.set_id(f.id * 2)			# even IDs only
 			if f.id < 2:
 				v_se3.set_fixed(True)       # Hold first frame constant

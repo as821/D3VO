@@ -727,6 +727,10 @@ void EdgeProjectD3VO::computeError(){
 
 
 void EdgeProjectD3VO::linearizeOplus(){
+    // General resource for DSO Jacobian derivation
+    // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
+    
     if(out_of_bounds) {
         // Out of bounds reprojection detected, cause optimizer to ignore this edge
         Eigen::Matrix<double,1,6> frame_error;
@@ -745,9 +749,6 @@ void EdgeProjectD3VO::linearizeOplus(){
     const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
     const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
 
-    // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
-    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
-    // J_k = [J_I * J_{geo}]     // No photometric components, we learn these with PoseNet. J_geo is just gradients wrt T_i and T_j
 
     // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p'))
     int X = dest_frame->pixel_inten.shape[0];
@@ -837,39 +838,6 @@ void EdgeProjectD3VO::linearizeOplus(){
     _jacobianOplus[1] = J_dest_T;
     _jacobianOplus[2] = J_host_T;
 }
-
-
-
-
-
-bool VertexD3VOFramePose::read(std::istream& is)
-{
-    Vector7d est;
-    for (int i=0; i<7; i++)
-      is  >> est[i];
-    setEstimate(internal::fromVectorQT(est));
-    return true;
-}
-
-bool VertexD3VOFramePose::write(std::ostream& os) const
-{
-    Vector7d est=internal::toVectorQT(_estimate);
-    for (int i=0; i<7; i++)
-      os << est[i] << " ";
-    return os.good();
-}
-
-bool VertexD3VOPointDepth::read(std::istream& is) {
-    Vector7d est;
-    for (int i=0; i<7; i++)
-        is  >> est[i];
-    return true;
-}
-
-bool VertexD3VOPointDepth::write(std::ostream& os) const {
-    return os.good();
-}
-
 
 
 } // end namespace
