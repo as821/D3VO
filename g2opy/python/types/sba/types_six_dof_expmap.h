@@ -142,7 +142,7 @@ void declareD3VO(py::module & m) {
         .def(py::init<const int, const int>())
         .def("set_to_origin_impl", &VertexD3VOPointDepth::setToOriginImpl)
         .def("oplus_impl", &VertexD3VOPointDepth::oplusImpl)  
-        .def("set_estimate", &VertexD3VOPointDepth::setEstimateDataImpl)        // Python
+        .def("set_estimate", &VertexD3VOPointDepth::setEstimateDataImplPython)     
         .def("get_estimate", &VertexD3VOPointDepth::getEstimateData)
     ;
 

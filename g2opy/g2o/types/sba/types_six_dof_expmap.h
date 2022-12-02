@@ -368,6 +368,8 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
         // Pixel coordinate in this Point's host frame
         Vector2D uv;
 
+        double depth_init[8];
+
         VertexD3VOPointDepth(const int u, const int v) {
             uv = Vector2D(u, v);
         }
@@ -433,19 +435,23 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
         }
 
 
-        // bool setEstimateDataImplPython(pybind11::array_t<double> est){
-        //     // Python interface for setting estimate
-        //     pybind11::buffer_info est_info = est.request();
-        //     double* _est = (double*) est_info.ptr;
+        bool setEstimateDataImplPython(pybind11::array_t<double> est){
+            // Python interface for setting estimate
+            pybind11::buffer_info est_info = est.request();
+            double* _est = (double*) est_info.ptr;
 
-        //     // std::cout << "setting estimate: ";
-        //     for(int i = 0; i < 8; i++) {
-        //         _estimate(i) = _est[i];
-        //         // std::cout << _est[i] << ", ";
-        //     }
-        //     // std::cout << std::endl;
-        //     return true;
-        // }
+            // Set up external facing estimate with depth estimate for the central pixel
+            _estimate = _est[0];
+
+            // Store all other estimates in separate variable (allows us to maintain a 1d parameterization but still have all 8 depth estimates)
+            // std::cout << "setting estimate: ";
+            for(int i = 0; i < 8; i++) {
+                depth_init[i] = _est[i];
+                // std::cout << _est[i] << ", ";
+            }
+            // std::cout << std::endl;
+            return true;
+        }
 
         virtual bool getEstimateData(double* est) const{
             // TODO(as) should switch this to returning all depth estimates

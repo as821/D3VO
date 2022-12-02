@@ -705,11 +705,12 @@ void EdgeProjectD3VO::computeError(){
         return;
     }
 
-    // Calculate error over all pixels in the pattern
+    // Calculate error over all pixels in the pattern --> use refined depth _estimate for central pixel, original initialization for the rest
     Vector3D error;
     Vector8D depth_est; // = p->estimate();
-    for(int i = 0; i < 8; i++) {
-        depth_est(i) = p->estimate();
+    depth_est(0) = p->estimate();
+    for(int i = 1; i < 8; i++) {
+        depth_est(i) = p->depth_init[i];
     }
     error.setZero();
     for(int idx = 0; idx < pattern.size(); idx++) {
