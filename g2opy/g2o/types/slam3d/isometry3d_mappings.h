@@ -36,7 +36,6 @@ namespace g2o {
 
   typedef Eigen::Matrix<double, 6, 1, Eigen::ColMajor> Vector6d;
   typedef Eigen::Matrix<double, 7, 1, Eigen::ColMajor> Vector7d;
-  // typedef Eigen::Matrix<double, 8, 1, Eigen::ColMajor> Vector8d;
 
   /**
    * internal functions used inside g2o.

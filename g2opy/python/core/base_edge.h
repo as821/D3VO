@@ -83,6 +83,7 @@ void declareBaseEdge(py::module & m) {
     templatedBaseEdge<2, Vector2D>(m, "_2_Vector2D");
     templatedBaseEdge<3, Vector3D>(m, "_3_Vector3D");
     templatedBaseEdge<4, Vector4D>(m, "_4_Vector4D");
+    
     templatedBaseEdge<6, Isometry3D>(m, "_6_Isometry3D");
     
 

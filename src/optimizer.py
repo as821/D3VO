@@ -67,17 +67,13 @@ class Map:
 		for p in self.points:
 			# setup vertex for depth estimate
 			host_frame, host_uv_coord = p.get_host_frame()
-			pt = g2o.VertexD3VOPointDepth(host_uv_coord[0], host_uv_coord[1])       
+			pt = g2o.VertexD3VOPointDepth(host_uv_coord[0], host_uv_coord[1])
 			pt.set_id(p.id * 2 + 1)		# odd IDs, no collisions with frame ID
 
-			# give optimizer initial depth estimates for all pixels in the DSO pixel pattern
-			pix_pattern, success = p.pixel_pattern(host_frame.image.shape[0], host_frame.image.shape[1])
-			if not success:
-				# pixel in pattern was out of bounds of the image
-				continue
-			host_depth_est = [host_frame.depth[uv[0]][uv[1]] for uv in pix_pattern]
-
-			pt.set_estimate(host_depth_est)
+			# unproject point with depth estimate onto 3D world using the host frame depth estimate
+			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
+			pt.set_estimate(host_depth_est)			
+			
 			pt.set_fixed(False)
 			opt_pts[p] = pt
 			opt.add_vertex(pt)
@@ -104,8 +100,8 @@ class Map:
 		for p in self.points:
 			# optimization gives unprojected point in 3D
 			est = opt_pts[p].estimate()
-			#assert est >= 0
-			#p.update_host_depth(est)
+			assert est >= 0
+			p.update_host_depth(est)
 			# print(est)
 	
 		for f in self.frames:

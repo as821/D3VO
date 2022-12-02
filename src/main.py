@@ -6,7 +6,7 @@ import argparse
 
 from d3vo import D3VO
 from display import display_trajectory
-from helper import calc_avg_matches, evaluate_pose, evaluate_global_pose
+from helper import calc_avg_matches, evaluate_pose
 
 
 DEBUG = True

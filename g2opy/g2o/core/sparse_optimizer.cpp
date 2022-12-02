@@ -388,7 +388,6 @@ namespace g2o{
     for (int i=0; i<iterations && ! terminate() && ok; i++){
       preIteration(i);
 
-
       if (_computeBatchStatistics) {
         G2OBatchStatistics& cstat = _batchStatistics[i];
         G2OBatchStatistics::setGlobalStats(&cstat);

@@ -45,7 +45,6 @@ namespace g2o {
   typedef Eigen::Matrix<double,2,1,Eigen::ColMajor>                               Vector2D;
   typedef Eigen::Matrix<double,3,1,Eigen::ColMajor>                               Vector3D;
   typedef Eigen::Matrix<double,4,1,Eigen::ColMajor>                               Vector4D;
-  typedef Eigen::Matrix<double,8,1,Eigen::ColMajor>                               Vector8D;
   typedef Eigen::Matrix<double,Eigen::Dynamic,1,Eigen::ColMajor>                  VectorXD;
 
   typedef Eigen::Matrix<int,2,2,Eigen::ColMajor>                                  Matrix2I;
