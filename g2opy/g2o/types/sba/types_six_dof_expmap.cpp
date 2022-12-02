@@ -826,7 +826,7 @@ void EdgeProjectD3VO::linearizeOplus(){
                     zero, R_th;
 
     // Calculate separated Jacobians for host and target frames
-    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose * -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
+    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose; //* -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
     Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;   // adjoint of target frame is the identity
 
     // Calculate full host and target frame Jacobians by incorporating image pixel gradients
