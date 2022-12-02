@@ -13,15 +13,12 @@ class D3VO:
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
 		and backend optimization (if optimize == True)."""
 		# TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)
-		frame_shape = frame.shape[:2][::-1]
 		np.random.seed(100)           # use same seed for debugging
-		uncertainty = 100 * np.random.rand(*frame_shape)     # drop image channels
+		uncertainty = np.zeros_like(frame)		# uncertainty == 0, get weight of 1. as uncertainty increases (positive or negative), weight drops
 		brightness_params = (0, 0)      # a, b
 
 		# Run DepthNet to get depth map
 		depth = self.nn.depth(frame)
-		#sh = frame.shape
-		#frame = frame.reshape(sh[1], sh[0], sh[2])
 
 		if len(self.mp.frames) == 0:
 			# Set first frame pose to identity rotation and no translation. Uses homogenous 4x4 matrix
