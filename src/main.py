@@ -6,7 +6,7 @@ import argparse
 
 from d3vo import D3VO
 from display import display_trajectory
-from helper import calc_avg_matches, evaluate_pose
+from helper import calc_avg_matches, evaluate_pose, evaluate_global_pose
 
 
 DEBUG = True
@@ -49,8 +49,9 @@ def offline_vo(cap, gt_path, save_path):
 			if gt_path != "" and PER_FRAME_ERROR:
 				# Do not include identity pose of first frame in evaluation
 				ates = evaluate_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
+				global_ates = evaluate_global_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
 				if len(ates) > 0:
-					print("Trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
+					print("Trajectory error: {:0.3f}, std: {:0.3f} (global pose: {:0.3f}, {:0.3f})\n".format(np.mean(ates), np.std(ates), np.mean(global_ates), np.std(global_ates)))
 		else:
 			break
 		i += 1

@@ -495,7 +495,6 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
         }
 
         virtual void oplusImpl(const double* update_)  {
-            std::cout << "frame oplus internal estimate: " << std::endl;
             Eigen::Map<const Vector6d> update(update_);
             setEstimate(SE3Quat::exp(update)*estimate());
         }

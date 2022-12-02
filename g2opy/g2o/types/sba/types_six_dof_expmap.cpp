@@ -748,8 +748,6 @@ void EdgeProjectD3VO::linearizeOplus(){
     // General resource for DSO Jacobian derivation
     // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
-    std::cout << "linearization beginning..." << std::endl;
-
     if(out_of_bounds) {
         // Out of bounds reprojection detected, cause optimizer to ignore this edge
         Eigen::Matrix<double,1,6> frame_error1;
@@ -791,15 +789,14 @@ void EdgeProjectD3VO::linearizeOplus(){
     }
 
     // Calculate depth Jacobian for each pixel in pattern
-    // Vector8D depth_est = p->estimate();
-    // Vector8D J_depth;
+    Vector8D J_depth;
     double depth_est = p->estimate();
-    Eigen::Matrix<double,1,1> J_depth;
+    // igen::Matrix<double,1,1> J_depth;
     J_depth.setZero();
     Vector2D J_Ij_pt0;
-    // for(int idx = 0; idx < pattern.size(); idx++) {
-        // Vector2D pt = pattern[idx];
-        Vector2D pt = p->uv;
+    for(int idx = 0; idx < pattern.size(); idx++) {
+        Vector2D pt = pattern[idx];
+        // Vector2D pt = p->uv;
         Vector3D unprojected_X = T_host_dest * cam->cam_unmap(pt, depth_est); //depth_est(idx));
         Vector2D p_prime = cam->cam_map(unprojected_X);
         int p_prime_u = (int) p_prime(0);
@@ -837,30 +834,28 @@ void EdgeProjectD3VO::linearizeOplus(){
             return;
         }
 
-        // if(idx == 0) {
+        if(idx == 0) {
             J_Ij_pt0 = J_Ij;
-        // }
+        }
 
         // d p' / dX   (where X is the unprojected and rotated point in 3D space)
         // double depth = depth_est(idx);
-        double depth = depth_est;
         Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
 
         // d X / d depth
-        Vector3D unprojected = cam->cam_unmap(pt, depth) / depth;
-        Vector3D dx_dd = unprojected_X / depth;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
+        Vector3D unprojected = cam->cam_unmap(pt, depth_est) / depth_est;
+        Vector3D dx_dd = unprojected_X / depth_est;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
 
         // d p' / d depth
         Vector2D dprime_ddepth = dprime_dX * dx_dd;
 
         // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
-        J_depth = J_Ij.transpose() * dprime_ddepth; // J_depth(idx) = J_Ij.transpose() * dprime_ddepth;
-    // }
-    std::cout << "frame jacobians" << std::endl;
+        J_depth(idx) = J_Ij.transpose() * dprime_ddepth;  // J_depth = J_Ij.transpose() * dprime_ddepth;
+    }
 
     // All "geometric" Jacobians rely only on the central pixel
-    // Vector3D unprojected_X = T_host_dest * cam->cam_unmap(p->uv, depth_est(0));
-    // Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
+    Vector3D unprojected_X = T_host_dest * cam->cam_unmap(p->uv, depth_est);    // depth_est(0)
+    Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
 
     // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
@@ -880,8 +875,6 @@ void EdgeProjectD3VO::linearizeOplus(){
     Eigen::Matrix<double, 3, 3> cross_t_th = skew(t_th); 
     Eigen::Matrix<double, 3, 3> zero;
     zero.setZero();
-
-    std::cout << "adjoint" << std::endl;
 
     // Assemble Ad_{T_{th}}
     Eigen::Matrix<double,6,6> host_adjoint;
@@ -906,13 +899,9 @@ void EdgeProjectD3VO::linearizeOplus(){
 
     
     // Order of these Jacobians is the same as the order of _vertices (depth, dest frame, host frame)
-    std::cout << "storing jacobians..." << std::endl;
     _jacobianOplus[0] = J_depth;
-    std::cout << "here 1" << std::endl;
     _jacobianOplus[1] = J_dest_T;
     _jacobianOplus[2] = J_host_T;
-
-    std::cout << "linearization complete..." << std::endl;
 }
 
 
