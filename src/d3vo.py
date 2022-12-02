@@ -28,10 +28,16 @@ class D3VO:
 			pose = np.eye(4)
 		else:
 			# Pass PoseNet the two most recent frames 
-            # TODO(as) this is the RELATIVE pose between frames. We need to add this to the GLOBAL pose estimate of the 
-            # previous frame in order to get the GLOBAL pose estimate for this new frame. Monodepth2 works on RELATIVE poses, 
-            # but DSO/D3VO works on GLOBAL poses
-			pose = self.nn.pose(self.mp.frames[-1].image, frame) #np.random.rand(1) * np.eye(4)
+			# TODO(as) this is the RELATIVE pose between frames. We need to add this to the GLOBAL pose estimate of the 
+			# previous frame in order to get the GLOBAL pose estimate for this new frame. Monodepth2 works on RELATIVE poses, 
+			# but DSO/D3VO works on GLOBAL poses
+			relative_pose = self.nn.pose(self.mp.frames[-1].image, frame) 
+			
+			# concatenate onto pose of previous frame (assumes poses are right multiplied by input global pointsz) --> gives global from relative pose
+			if len(self.mp.frames) > 1:
+				pose = relative_pose * self.mp.frames[-1].pose		
+			else:
+				pose = relative_pose
 
 		# Run frontend tracking
 		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
