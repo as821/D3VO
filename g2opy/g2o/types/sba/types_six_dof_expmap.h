@@ -392,6 +392,10 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
             *est = _estimate;
             return true;
         }
+
+        virtual bool read (std::istream& is){return false;}
+
+        virtual bool write (std::ostream& os) const {return false;}
 };
 
 
@@ -428,6 +432,10 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
             Eigen::Map<const Vector6d> update(update_);
             setEstimate(SE3Quat::exp(update)*estimate());
         }
+
+    virtual bool read (std::istream& is){return false;}
+
+    virtual bool write (std::ostream& os) const {return false;}
 
 };
 
