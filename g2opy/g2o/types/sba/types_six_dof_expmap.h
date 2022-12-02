@@ -361,8 +361,7 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
         bool out_of_bounds;
 };
 
-
-class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
+class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<8, Vector8D>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -373,25 +372,90 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
             uv = Vector2D(u, v);
         }
 
+        bool pixelPattern(std::vector<Vector2D>& vec, int height, int width) const {
+            // Store the (u, v) coordinates of the DSO pixel pattern in the given vector. Return true on success, false if any of the pixels are out of bounds.
+            if(vec.size() != 0) {
+                // Vector not empty
+                return false;
+            }
+
+            // Generate pixel pattern
+            int u = uv(0);
+            int v = uv(1);
+            vec.push_back(Vector2D(u, v));     // NOTE: central pixel is the first in the vector
+            vec.push_back(Vector2D(u - 2, v));
+            vec.push_back(Vector2D(u + 2, v));
+            vec.push_back(Vector2D(u, v - 2));
+            vec.push_back(Vector2D(u, v + 2));
+            vec.push_back(Vector2D(u - 1, v+1));
+            vec.push_back(Vector2D(u - 1, v-1));
+            vec.push_back(Vector2D(u + 1, v - 1));
+
+            // Check image bounds
+            for(Vector2D v : vec) {
+                if(v(0) < 0 || v(1) < 0 || v(0) >= height || v(1) >= width) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
         virtual void setToOriginImpl() {
-            _estimate = 0.;
+            for(int i = 0; i < 8; i++) {
+                _estimate(i) = 0;
+            }
+            // _estimate = 0.;
         }
 
         virtual void oplusImpl(const double* update_)  {
             // std::cout << "VertexD3VOPointDepth oplusImpl update: (" << *update_ << ")" << std::endl;
-            _estimate += (*update_);
+            std::cout << "setting depth oplus: " << std::endl;
+            Eigen::Map<const Vector8D> update(update_);
+            std::cout << "(here1)" << std::endl;
+            for(int i = 0; i < 8; i++) {
+                std::cout << "\n" << update(i) << std::endl;
+                _estimate(i) += update(i);
+            }
+            // _estimate += (*update_);
         }
 
         virtual bool setEstimateDataImpl(const double* est){
             // std::cout << "setting (" << uv(0) << ", "<< uv(1) << ") estimate to: " << *est << std::endl;
-            _estimate = *est;
+            // _estimate = *est;
+            std::cout << "setting depth internal estimate: " << std::endl;
+            Eigen::Map<const Vector8D> _est(est);
+            for(int i = 0; i < 8; i++) {
+                _estimate(i) = _est(i);
+                std::cout << _est(i) << ", ";
+            }
+            std::cout << std::endl;
+            return true;
+        }
+
+
+        bool setEstimateDataImplPython(pybind11::array_t<double> est){
+            // Python interface for setting estimate
+            pybind11::buffer_info est_info = est.request();
+            double* _est = (double*) est_info.ptr;
+
+            // std::cout << "setting estimate: ";
+            for(int i = 0; i < 8; i++) {
+                _estimate(i) = _est[i];
+                // std::cout << _est[i] << ", ";
+            }
+            // std::cout << std::endl;
             return true;
         }
 
         virtual bool getEstimateData(double* est) const{
-            *est = _estimate;
+            // TODO(as) should switch this to returning all depth estimates
+            // Only returns a single depth estimate (for the point specified to the constructor)
+            *est = _estimate(0);
             return true;
         }
+
+        virtual bool read (std::istream& is){return false;}
+        virtual bool write (std::ostream& os) const {return false;}
 };
 
 
@@ -425,10 +489,13 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
         }
 
         virtual void oplusImpl(const double* update_)  {
+            std::cout << "frame oplus internal estimate: " << std::endl;
             Eigen::Map<const Vector6d> update(update_);
             setEstimate(SE3Quat::exp(update)*estimate());
         }
 
+        virtual bool read (std::istream& is){return false;}
+        virtual bool write (std::ostream& os) const {return false;}
 };
 
 

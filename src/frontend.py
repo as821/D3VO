@@ -69,7 +69,28 @@ class Point:
 		frame.pts[idx] = self
 		self.frames.append(frame)
 		self.idxs.append(idx)
+
+	def pixel_pattern(self, max_height, max_width):
+		"""Return pixel pattern in order that matches the C++ code, returns False if any pixel is out of bounds."""
+		_, uv = self.get_host_frame()
+		u, v = uv[0], uv[1]
+		out = [uv]
+		out.append((u - 2, v))
+		out.append((u + 2, v))
+		out.append((u, v - 2))
+		out.append((u, v + 2))
+		out.append((u - 1, v+1))
+		out.append((u - 1, v-1))
+		out.append((u + 1, v - 1))
+
+		# Check image bounds
+		for pt in out:
+			if pt[0] < 0 or pt[1] < 0 or pt[0] >= max_height or pt[1] >= max_width:
+				return None, False
+		return out, True
 		
+
+
 
 class Frame:
 	def __init__(self, map, image, depth, uncertainty, pose, brightness_params):

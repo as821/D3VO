@@ -59,6 +59,7 @@ void declareBaseVertex(py::module & m) {
     templatedBaseVertex<1, double>(m, "_1_double");
     templatedBaseVertex<2, Vector2D>(m, "_2_Vector2D");
     templatedBaseVertex<3, Vector3D>(m, "_3_Vector3D");
+    templatedBaseVertex<8, Vector8D>(m, "_8_Vector8D");
     templatedBaseVertex<4, Eigen::Matrix<double, 5, 1, Eigen::ColMajor>>(m, "_4_Vector5d");   // sba
 
     templatedBaseVertex<6, Isometry3D>(m, "_6_Isometry3D");   // slam3d

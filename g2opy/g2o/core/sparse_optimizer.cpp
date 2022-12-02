@@ -365,6 +365,7 @@ namespace g2o{
 
   int SparseOptimizer::optimize(int iterations, bool online)
   {
+    std::cout << "optimizer starting..." << std::endl;
     if (_ivMap.size() == 0) {
       cerr << __PRETTY_FUNCTION__ << ": 0 vertices to optimize, maybe forgot to call initializeOptimization()" << endl;
       return -1;
@@ -386,7 +387,10 @@ namespace g2o{
     
     OptimizationAlgorithm::SolverResult result = OptimizationAlgorithm::OK;
     for (int i=0; i<iterations && ! terminate() && ok; i++){
+        std::cout << "preiteration" << std::endl;
       preIteration(i);
+        std::cout << "post-preiteration" << std::endl;
+
 
       if (_computeBatchStatistics) {
         G2OBatchStatistics& cstat = _batchStatistics[i];
@@ -397,7 +401,9 @@ namespace g2o{
       }
       
       double ts = get_monotonic_time();
+      std::cout << "starting solver algorithm" << std::endl;
       result = _algorithm->solve(i, online);
+      std::cout << "algorithm solver returned." << std::endl;
       ok = ( result == OptimizationAlgorithm::OK );
 
       bool errorComputed = false;
@@ -422,16 +428,20 @@ namespace g2o{
         cerr << endl;
       }
       ++cjIterations; 
+    std::cout << "postiteration" << std::endl;
       postIteration(i);
+    std::cout << "post-postiteration" << std::endl;
     }
     if (result == OptimizationAlgorithm::Fail) {
       return 0;
     }
+    std::cout << "optimizer returning." << std::endl;
     return cjIterations;
   }
 
   void SparseOptimizer::update(const double* update)
   {
+    std::cout << "starting optimizer update..." << std::endl;
     // update the graph by calling oplus on the vertices
     for (size_t i=0; i < _ivMap.size(); ++i) {
       OptimizableGraph::Vertex* v= _ivMap[i];
@@ -443,6 +453,7 @@ namespace g2o{
       v->oplus(update);
       update += v->dimension();
     }
+    std::cout << "optimizer update complete" << std::endl;
   }
 
   void SparseOptimizer::setComputeBatchStatistics(bool computeBatchStatistics)

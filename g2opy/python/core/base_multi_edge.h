@@ -59,7 +59,7 @@ void declareBaseMultiEdge(py::module & m) {
     templatedBaseMultiEdge<2, Vector2D>(m, "_2_Vector2D");
     templatedBaseMultiEdge<3, Vector3D>(m, "_3_Vector3D");
     templatedBaseMultiEdge<4, Vector4D>(m, "_4_Vector4D");
-    
+
 
     //templatedDynamicBaseMultiEdge<Vector2D>(m, "_Vector2D");
     //templatedDynamicBaseMultiEdge<Vector3D>(m, "_Vector3D");
