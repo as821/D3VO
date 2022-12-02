@@ -361,7 +361,7 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
         bool out_of_bounds;
 };
 
-class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<8, Vector8D>{
+class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
@@ -401,56 +401,56 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<8, Vector8D>{
         }
 
         virtual void setToOriginImpl() {
-            for(int i = 0; i < 8; i++) {
-                _estimate(i) = 0;
-            }
-            // _estimate = 0.;
+            // for(int i = 0; i < 8; i++) {
+            //     _estimate(i) = 0;
+            // }
+            _estimate = 0.;
         }
 
         virtual void oplusImpl(const double* update_)  {
             // std::cout << "VertexD3VOPointDepth oplusImpl update: (" << *update_ << ")" << std::endl;
-            std::cout << "setting depth oplus: " << std::endl;
-            Eigen::Map<const Vector8D> update(update_);
-            std::cout << "(here1)" << std::endl;
-            for(int i = 0; i < 8; i++) {
-                std::cout << "\n" << update(i) << std::endl;
-                _estimate(i) += update(i);
-            }
-            // _estimate += (*update_);
+            // std::cout << "setting depth oplus: " << std::endl;
+            // Eigen::Map<const Vector8D> update(update_);
+            // std::cout << "(here1)" << std::endl;
+            // for(int i = 0; i < 8; i++) {
+            //     std::cout << "\n" << update(i) << std::endl;
+            //     _estimate(i) += update(i);
+            // }
+            _estimate += (*update_);
         }
 
         virtual bool setEstimateDataImpl(const double* est){
             // std::cout << "setting (" << uv(0) << ", "<< uv(1) << ") estimate to: " << *est << std::endl;
-            // _estimate = *est;
-            std::cout << "setting depth internal estimate: " << std::endl;
-            Eigen::Map<const Vector8D> _est(est);
-            for(int i = 0; i < 8; i++) {
-                _estimate(i) = _est(i);
-                std::cout << _est(i) << ", ";
-            }
-            std::cout << std::endl;
-            return true;
-        }
-
-
-        bool setEstimateDataImplPython(pybind11::array_t<double> est){
-            // Python interface for setting estimate
-            pybind11::buffer_info est_info = est.request();
-            double* _est = (double*) est_info.ptr;
-
-            // std::cout << "setting estimate: ";
-            for(int i = 0; i < 8; i++) {
-                _estimate(i) = _est[i];
-                // std::cout << _est[i] << ", ";
-            }
+            _estimate = *est;
+            // std::cout << "setting depth internal estimate: " << std::endl;
+            // Eigen::Map<const Vector8D> _est(est);
+            // for(int i = 0; i < 8; i++) {
+            //     _estimate(i) = _est(i);
+            //     std::cout << _est(i) << ", ";
+            // }
             // std::cout << std::endl;
             return true;
         }
 
+
+        // bool setEstimateDataImplPython(pybind11::array_t<double> est){
+        //     // Python interface for setting estimate
+        //     pybind11::buffer_info est_info = est.request();
+        //     double* _est = (double*) est_info.ptr;
+
+        //     // std::cout << "setting estimate: ";
+        //     for(int i = 0; i < 8; i++) {
+        //         _estimate(i) = _est[i];
+        //         // std::cout << _est[i] << ", ";
+        //     }
+        //     // std::cout << std::endl;
+        //     return true;
+        // }
+
         virtual bool getEstimateData(double* est) const{
             // TODO(as) should switch this to returning all depth estimates
             // Only returns a single depth estimate (for the point specified to the constructor)
-            *est = _estimate(0);
+            *est = _estimate; // _estimate(0);
             return true;
         }
 

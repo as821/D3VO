@@ -71,11 +71,15 @@ class Map:
 			pt.set_id(p.id * 2 + 1)		# odd IDs, no collisions with frame ID
 
 			# give optimizer initial depth estimates for all pixels in the DSO pixel pattern
-			pix_pattern, success = p.pixel_pattern(host_frame.image.shape[0], host_frame.image.shape[1])
-			if not success:
-				# pixel in pattern was out of bounds of the image
-				continue
-			host_depth_est = [host_frame.depth[uv[0]][uv[1]] for uv in pix_pattern]
+			# pix_pattern, success = p.pixel_pattern(host_frame.image.shape[0], host_frame.image.shape[1])
+			# if not success:
+			# 	# pixel in pattern was out of bounds of the image
+			# 	continue
+			# host_depth_est = [host_frame.depth[uv[0]][uv[1]] for uv in pix_pattern]
+
+
+			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
+
 			pt.set_estimate(host_depth_est)
 			pt.set_fixed(False)
 			opt_pts[p] = pt

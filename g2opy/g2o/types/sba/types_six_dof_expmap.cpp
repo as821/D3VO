@@ -707,7 +707,10 @@ void EdgeProjectD3VO::computeError(){
 
     // Calculate error over all pixels in the pattern
     Vector3D error;
-    Vector8D depth_est = p->estimate();
+    Vector8D depth_est; // = p->estimate();
+    for(int i = 0; i < 8; i++) {
+        depth_est(i) = p->estimate();
+    }
     error.setZero();
     for(int idx = 0; idx < pattern.size(); idx++) {
         Vector2D pt = pattern[idx];
@@ -746,158 +749,162 @@ void EdgeProjectD3VO::linearizeOplus(){
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
     std::cout << "linearization beginning..." << std::endl;
 
-    // if(out_of_bounds) {
-    //     // Out of bounds reprojection detected, cause optimizer to ignore this edge
-    //     Eigen::Matrix<double,1,6> frame_error1;
-    //     Eigen::Matrix<double,1,6> frame_error2;
-    //     Vector8D depth_error;
-    //     depth_error.setZero();
-    //     frame_error1.setZero(); 
-    //     frame_error2.setZero(); 
-    //     _jacobianOplus[0] = depth_error;
-    //     _jacobianOplus[1] = frame_error1;
-    //     _jacobianOplus[2] = frame_error2;
-    //     out_of_bounds = false;
-    //     return;
-    // }
+    if(out_of_bounds) {
+        // Out of bounds reprojection detected, cause optimizer to ignore this edge
+        Eigen::Matrix<double,1,6> frame_error1;
+        Eigen::Matrix<double,1,6> frame_error2;
+        Vector8D depth_error;
+        depth_error.setZero();
+        frame_error1.setZero(); 
+        frame_error2.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error1;
+        _jacobianOplus[2] = frame_error2;
+        out_of_bounds = false;
+        return;
+    }
     
-    // const VertexD3VOPointDepth* p = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
-    // const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
-    // const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
-    // const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
+    const VertexD3VOPointDepth* p = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
+    const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
+    const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
+    const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
 
-    // int X = dest_frame->pixel_inten.shape[0];
-    // int Y = dest_frame->pixel_inten.shape[1];
-    // int Z = host_frame->pixel_inten.shape[2];
-    // Isometry3D T_host_dest = dest_frame->estimate() * host_frame->estimate().inverse();
+    int X = dest_frame->pixel_inten.shape[0];
+    int Y = dest_frame->pixel_inten.shape[1];
+    int Z = host_frame->pixel_inten.shape[2];
+    Isometry3D T_host_dest = dest_frame->estimate() * host_frame->estimate().inverse();
 
-    // // Generate pixel pattern
-    // std::vector<Vector2D> pattern;
-    // if(!p->pixelPattern(pattern, host_frame->pixel_inten.shape[0], host_frame->pixel_inten.shape[1])) {
-    //     Eigen::Matrix<double,1,6> frame_error1;
-    //     Eigen::Matrix<double,1,6> frame_error2;
-    //     Vector8D depth_error;
-    //     depth_error.setZero();
-    //     frame_error1.setZero(); 
-    //     frame_error2.setZero(); 
-    //     _jacobianOplus[0] = depth_error;
-    //     _jacobianOplus[1] = frame_error1;
-    //     _jacobianOplus[2] = frame_error2;
-    //     return;
-    // }
+    // Generate pixel pattern
+    std::vector<Vector2D> pattern;
+    if(!p->pixelPattern(pattern, host_frame->pixel_inten.shape[0], host_frame->pixel_inten.shape[1])) {
+        Eigen::Matrix<double,1,6> frame_error1;
+        Eigen::Matrix<double,1,6> frame_error2;
+        Vector8D depth_error;
+        depth_error.setZero();
+        frame_error1.setZero(); 
+        frame_error2.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error1;
+        _jacobianOplus[2] = frame_error2;
+        return;
+    }
 
-    // // Calculate depth Jacobian for each pixel in pattern
+    // Calculate depth Jacobian for each pixel in pattern
     // Vector8D depth_est = p->estimate();
     // Vector8D J_depth;
-    // J_depth.setZero();
-    // Vector2D J_Ij_pt0;
+    double depth_est = p->estimate();
+    Eigen::Matrix<double,1,1> J_depth;
+    J_depth.setZero();
+    Vector2D J_Ij_pt0;
     // for(int idx = 0; idx < pattern.size(); idx++) {
-    //     Vector2D pt = pattern[idx];
-    //     Vector3D unprojected_X = T_host_dest * cam->cam_unmap(pt, depth_est(idx));
-    //     Vector2D p_prime = cam->cam_map(unprojected_X);
-    //     int p_prime_u = (int) p_prime(0);
-    //     int p_prime_v = (int) p_prime(1);
+        // Vector2D pt = pattern[idx];
+        Vector2D pt = p->uv;
+        Vector3D unprojected_X = T_host_dest * cam->cam_unmap(pt, depth_est); //depth_est(idx));
+        Vector2D p_prime = cam->cam_map(unprojected_X);
+        int p_prime_u = (int) p_prime(0);
+        int p_prime_v = (int) p_prime(1);
         
-    //     // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p'))
-    //     Vector2D J_Ij;
+        // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p'))
+        Vector2D J_Ij;
         
-    //     // Validate point not near the edge of the image
-    //     if(p_prime_u + 1 < X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 < Y) {
-    //         // Note: top left of image is (0, 0)
-    //         double* dest_img = (double*) dest_frame->pixel_inten.ptr;
-    //         int dest_base_idx = p_prime_u * Y * Z + Z * p_prime_v;
-    //         double dx_r = dest_img[dest_base_idx + Z] - dest_img[dest_base_idx - Z];        // right - left;
-    //         double dy_r = dest_img[dest_base_idx + Y*Z] - dest_img[dest_base_idx - Y*Z];    // bottom - top;
-    //         double dx_g = dest_img[dest_base_idx + Z + 1] - dest_img[dest_base_idx - Z + 1];  
-    //         double dy_g = dest_img[dest_base_idx + Y*Z + 1] - dest_img[dest_base_idx - Y*Z + 1];   
-    //         double dx_b = dest_img[dest_base_idx + Z + 2] - dest_img[dest_base_idx - Z + 2]; 
-    //         double dy_b = dest_img[dest_base_idx + Y*Z + 2] - dest_img[dest_base_idx - Y*Z + 2];  
+        // Validate point not near the edge of the image
+        if(p_prime_u + 1 < X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 < Y) {
+            // Note: top left of image is (0, 0)
+            double* dest_img = (double*) dest_frame->pixel_inten.ptr;
+            int dest_base_idx = p_prime_u * Y * Z + Z * p_prime_v;
+            double dx_r = dest_img[dest_base_idx + Z] - dest_img[dest_base_idx - Z];        // right - left;
+            double dy_r = dest_img[dest_base_idx + Y*Z] - dest_img[dest_base_idx - Y*Z];    // bottom - top;
+            double dx_g = dest_img[dest_base_idx + Z + 1] - dest_img[dest_base_idx - Z + 1];  
+            double dy_g = dest_img[dest_base_idx + Y*Z + 1] - dest_img[dest_base_idx - Y*Z + 1];   
+            double dx_b = dest_img[dest_base_idx + Z + 2] - dest_img[dest_base_idx - Z + 2]; 
+            double dy_b = dest_img[dest_base_idx + Y*Z + 2] - dest_img[dest_base_idx - Y*Z + 2];  
 
-    //         // Gradient of RGB image is not well-defined, just take the average over gradients from all channels
-    //         J_Ij = Vector2D((dx_r + dx_g + dx_b) / 3, (dy_r + dy_g + dy_b) / 3);
-    //     }
-    //     else {
-    //         // Out of bounds reprojection detected / failure to calculate image gradient, cause optimizer to ignore this edge
-    //         Eigen::Matrix<double,1,6> frame_error1;
-    //         Eigen::Matrix<double,1,6> frame_error2;
-    //         Vector8D depth_error;
-    //         depth_error.setZero();
-    //         frame_error1.setZero(); 
-    //         frame_error2.setZero(); 
-    //         _jacobianOplus[0] = depth_error;
-    //         _jacobianOplus[1] = frame_error1;
-    //         _jacobianOplus[2] = frame_error2;
-    //         return;
-    //     }
+            // Gradient of RGB image is not well-defined, just take the average over gradients from all channels
+            J_Ij = Vector2D((dx_r + dx_g + dx_b) / 3, (dy_r + dy_g + dy_b) / 3);
+        }
+        else {
+            // Out of bounds reprojection detected / failure to calculate image gradient, cause optimizer to ignore this edge
+            Eigen::Matrix<double,1,6> frame_error1;
+            Eigen::Matrix<double,1,6> frame_error2;
+            Vector8D depth_error;
+            depth_error.setZero();
+            frame_error1.setZero(); 
+            frame_error2.setZero(); 
+            _jacobianOplus[0] = depth_error;
+            _jacobianOplus[1] = frame_error1;
+            _jacobianOplus[2] = frame_error2;
+            return;
+        }
 
-    //     if(idx == 0) {
-    //         J_Ij_pt0 = J_Ij;
-    //     }
+        // if(idx == 0) {
+            J_Ij_pt0 = J_Ij;
+        // }
 
-    //     // d p' / dX   (where X is the unprojected and rotated point in 3D space)
-    //     double depth = depth_est(idx);
-    //     Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
+        // d p' / dX   (where X is the unprojected and rotated point in 3D space)
+        // double depth = depth_est(idx);
+        double depth = depth_est;
+        Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
 
-    //     // d X / d depth
-    //     Vector3D unprojected = cam->cam_unmap(pt, depth) / depth;
-    //     Vector3D dx_dd = unprojected_X / depth;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
+        // d X / d depth
+        Vector3D unprojected = cam->cam_unmap(pt, depth) / depth;
+        Vector3D dx_dd = unprojected_X / depth;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
 
-    //     // d p' / d depth
-    //     Vector2D dprime_ddepth = dprime_dX * dx_dd;
+        // d p' / d depth
+        Vector2D dprime_ddepth = dprime_dX * dx_dd;
 
-    //     // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
-    //     J_depth(idx) = J_Ij.transpose() * dprime_ddepth;
+        // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
+        J_depth = J_Ij.transpose() * dprime_ddepth; // J_depth(idx) = J_Ij.transpose() * dprime_ddepth;
     // }
-    // std::cout << "frame jacobians" << std::endl;
+    std::cout << "frame jacobians" << std::endl;
 
-    // // All "geometric" Jacobians rely only on the central pixel
+    // All "geometric" Jacobians rely only on the central pixel
     // Vector3D unprojected_X = T_host_dest * cam->cam_unmap(p->uv, depth_est(0));
     // Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
 
-    // // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
-    // // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
-    // // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
-    // Eigen::Matrix<double,3,6> dX_drelative = d_expy_d_y(unprojected_X);
+    // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
+    // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
+    Eigen::Matrix<double,3,6> dX_drelative = d_expy_d_y(unprojected_X);
 
-    // // d X / d (T_j * T_i^{-1})
-    // Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
+    // d X / d (T_j * T_i^{-1})
+    Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
 
-    // // Separate this relative pose Jacobian (T_j * T_i^{-1}) into Jacobians for T_i and T_j using the adjoint transformation
-    // // https://ethaneade.com/lie.pdf (pg4/5)
-    // // https://www.cnblogs.com/JingeTU/p/8306727.html 
-    // // https://www.ethaneade.com/latex2html/lie/node17.html --> Adjoint of a matrix in SE(3)
-    // // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Equation 7.45
-    // Eigen::Matrix<double, 3, 3> R_th = T_host_dest.rotation().matrix();  
-    // Eigen::Matrix<double, 1, 3> t_th = T_host_dest.translation();
-    // Eigen::Matrix<double, 3, 3> cross_t_th = skew(t_th); 
-    // Eigen::Matrix<double, 3, 3> zero;
-    // zero.setZero();
+    // Separate this relative pose Jacobian (T_j * T_i^{-1}) into Jacobians for T_i and T_j using the adjoint transformation
+    // https://ethaneade.com/lie.pdf (pg4/5)
+    // https://www.cnblogs.com/JingeTU/p/8306727.html 
+    // https://www.ethaneade.com/latex2html/lie/node17.html --> Adjoint of a matrix in SE(3)
+    // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Equation 7.45
+    Eigen::Matrix<double, 3, 3> R_th = T_host_dest.rotation().matrix();  
+    Eigen::Matrix<double, 1, 3> t_th = T_host_dest.translation();
+    Eigen::Matrix<double, 3, 3> cross_t_th = skew(t_th); 
+    Eigen::Matrix<double, 3, 3> zero;
+    zero.setZero();
 
-    // std::cout << "adjoint" << std::endl;
+    std::cout << "adjoint" << std::endl;
 
-    // // Assemble Ad_{T_{th}}
-    // Eigen::Matrix<double,6,6> host_adjoint;
-    // host_adjoint << R_th, cross_t_th * R_th,
-    //                 zero, R_th;
+    // Assemble Ad_{T_{th}}
+    Eigen::Matrix<double,6,6> host_adjoint;
+    host_adjoint << R_th, cross_t_th * R_th,
+                    zero, R_th;
 
-    // // Calculate separated Jacobians for host and target frames
-    // Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose * -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
-    // Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;   // adjoint of target frame is the identity
+    // Calculate separated Jacobians for host and target frames
+    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose * -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
+    Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;   // adjoint of target frame is the identity
 
-    // // Calculate full host and target frame Jacobians by incorporating image pixel gradients
-    // Eigen::Matrix<double,1,6> J_host_T = J_Ij_pt0.transpose() * J_host_p_prime;
-    // Eigen::Matrix<double,1,6> J_dest_T = J_Ij_pt0.transpose() * J_dest_p_prime;
+    // Calculate full host and target frame Jacobians by incorporating image pixel gradients
+    Eigen::Matrix<double,1,6> J_host_T = J_Ij_pt0.transpose() * J_host_p_prime;
+    Eigen::Matrix<double,1,6> J_dest_T = J_Ij_pt0.transpose() * J_dest_p_prime;
 
+    // Vector8D J_depth;
+    // J_depth.setZero();
+    // Eigen::Matrix<double,1,6> J_host_T;
+    // Eigen::Matrix<double,1,6> J_dest_T;
+
+    // J_host_T.setZero();
+    // J_dest_T.setZero();
+
+    
     // Order of these Jacobians is the same as the order of _vertices (depth, dest frame, host frame)
-
-    Vector8D J_depth;
-    J_depth.setZero();
-    Eigen::Matrix<double,1,6> J_host_T;
-    Eigen::Matrix<double,1,6> J_dest_T;
-
-    J_host_T.setZero();
-    J_dest_T.setZero();
-
     std::cout << "storing jacobians..." << std::endl;
     _jacobianOplus[0] = J_depth;
     std::cout << "here 1" << std::endl;
