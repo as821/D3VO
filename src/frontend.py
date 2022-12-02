@@ -81,6 +81,8 @@ class Frame:
 		self.brightness_params = brightness_params
 		self.pose = pose
 
+		self.marginalize = False
+
 		# Run frontend keypoint extractor
 		self.kps, self.des = extract_features(image)
 		self.pts = {}                       # map kps/des list index to corresponding Point object   

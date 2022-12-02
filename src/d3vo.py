@@ -27,8 +27,16 @@ class D3VO:
 			# Pass PoseNet the two most recent frames 
 			pose = self.nn.pose(self.mp.frames[-1].image, frame) #np.random.rand(1) * np.eye(4)
 
+			# if len(self.mp.frames) < 2:
+			# 	pose = relative
+			# else:
+			# 	pose = relative @ self.mp.frames[-1].pose
+
 		# Run frontend tracking
 		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
+			return
+
+		if len(self.mp.keyframes) < 3:
 			return
 
 		# Run backend optimization
@@ -64,5 +72,8 @@ class D3VO:
 				pt.add_observation(prev_f, idx2)
 
 		# TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
+		if f.id % 3 == 0:
+			self.mp.keyframes.append(f)
+			return True
 
-		return True
+		return False
