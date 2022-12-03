@@ -121,6 +121,8 @@ class Trainer:
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True, num_workers=self.opt.num_workers, pin_memory=True, drop_last=True
         )
+
+        # breakpoint()
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width, self.opt.frame_ids, 4, is_train=False, img_ext=img_ext
         )
@@ -243,6 +245,7 @@ class Trainer:
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
 
+        # breakpoint()
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses(inputs, outputs)
 
@@ -323,10 +326,10 @@ class Trainer:
         """
         self.set_eval()
         try:
-            inputs = self.val_iter.next()
+            inputs = next(self.val_iter)
         except StopIteration:
             self.val_iter = iter(self.val_loader)
-            inputs = self.val_iter.next()
+            inputs = next(self.val_iter)
 
         with torch.no_grad():
             outputs, losses = self.process_batch(inputs)
@@ -345,10 +348,13 @@ class Trainer:
         """
         for scale in self.opt.scales:
             disp = outputs[("disp", scale)]
+            sigma = outputs[("disp-sigma",scale)]
             if self.opt.v1_multiscale:
                 source_scale = scale
             else:
                 disp = F.interpolate(disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                disp_sigma = F.interpolate(sigma, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                outputs[("disp-sigma",scale)] = disp_sigma
                 source_scale = 0
 
             _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
@@ -394,6 +400,8 @@ class Trainer:
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
         else:
+            # print(sigma.shape, self.ssim(pred, target).shape,pred.shape,target.shape)
+            # print()
             ssim_loss = (self.ssim(pred, target)) / sigma + torch.log(sigma)
             reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
@@ -424,6 +432,8 @@ class Trainer:
             color = inputs[("color", 0, scale)]
             target = inputs[("color", 0, source_scale)]
 
+            # print(disp.shape,sigma.shape)
+
             for frame_id in self.opt.frame_ids[1:]:
                 pred = outputs[("color", frame_id, scale)]
                 a = outputs[("a", 0, frame_id)].unsqueeze(1)
@@ -440,7 +450,7 @@ class Trainer:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
                     pred = inputs[("color", frame_id, source_scale)]
-                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target))
+                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target,sigma))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
@@ -487,8 +497,10 @@ class Trainer:
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
+            # breakpoint()
             smooth_loss = get_smooth_loss(norm_disp, color)
-            reg_loss = smooth_loss + self.opt.ab_weight * ab_loss
+            
+            reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)
 
             loss += self.opt.disparity_smoothness * reg_loss / (2 ** scale)
 

@@ -61,7 +61,7 @@ class DepthDecoder(nn.Module):
             x = self.convs[("upconv", i, 1)](x)
             if i in self.scales:
                 outs = self.sigmoid(self.convs[("dispconv", i)](x))
-                self.outputs[("disp", i)] = outs[:, 0, :, :]
-                self.outputs[("disp-sigma", i)] = outs[:, 1, :, :]
+                self.outputs[("disp", i)] = torch.unsqueeze(outs[:, 0, :, :], axis=1)
+                self.outputs[("disp-sigma", i)] = torch.unsqueeze(outs[:, 1, :, :], axis=1)
 
         return self.outputs

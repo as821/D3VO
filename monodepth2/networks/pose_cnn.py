@@ -31,11 +31,11 @@ class PoseCNN(nn.Module):
 
         self.num_convs = len(self.convs)
 
-        self.relu = nn.ReLU(True)
+        self.relu = nn.ReLU()
 
-        self.tanh = nn.Tanh(True)
+        self.tanh = nn.Tanh()
 
-        self.softplus = nn.Softplus(True)
+        self.softplus = nn.Softplus()
 
         self.net = nn.ModuleList(list(self.convs.values()))
 

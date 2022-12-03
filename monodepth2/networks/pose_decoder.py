@@ -28,6 +28,11 @@ class PoseDecoder(nn.Module):
         self.convs[("pose", 1)] = nn.Conv2d(256, 256, 3, stride, 1)
         self.convs[("pose", 2)] = nn.Conv2d(256, 6 * num_frames_to_predict_for, 1)
 
+        self.a_conv = nn.Conv2d(256, num_frames_to_predict_for, 1)
+        self.b_conv = nn.Conv2d(256, num_frames_to_predict_for, 1)
+
+        self.tanh = nn.Tanh()
+        self.softplus = nn.Softplus()
         self.relu = nn.ReLU()
 
         self.net = nn.ModuleList(list(self.convs.values()))
@@ -39,16 +44,32 @@ class PoseDecoder(nn.Module):
         cat_features = torch.cat(cat_features, 1)
 
         out = cat_features
+        out_ab = None
         for i in range(3):
             out = self.convs[("pose", i)](out)
             if i != 2:
                 out = self.relu(out)
 
-        out = out.mean(3).mean(2)
+            if i==1:
+                out_ab = out
+
+        out_pose = out.mean(3).mean(2)
+
+
+        out_a = self.a_conv(out_ab)
+        out_a = self.softplus(out_a)
+        out_a = out_a.mean(3).mean(2)
+        out_b = self.b_conv(out_ab)
+        out_b = self.tanh(out_b)
+        out_b = out_b.mean(3).mean(2)
 
         out = 0.01 * out.view(-1, self.num_frames_to_predict_for, 1, 6)
+        out_a = 0.01 * out_a.view(-1, self.num_frames_to_predict_for, 1, 1)
+        out_b = 0.01 * out_b.view(-1, self.num_frames_to_predict_for, 1, 1)
 
-        axisangle = out[..., :3]
-        translation = out[..., 3:]
+        axisangle = out_pose[..., :3]
+        translation = out_pose[..., 3:]
+        a = out_a
+        b = out_b
 
-        return axisangle, translation
+        return axisangle, translation, a, b
