@@ -445,7 +445,10 @@ class Trainer:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
                     pred = inputs[("color", frame_id, source_scale)]
-                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target,sigma))
+                    a = outputs[("a", 0, frame_id)].unsqueeze(1)
+                    b = outputs[("b", 0, frame_id)].unsqueeze(1)
+                    target_frame = target * a + b
+                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame, sigma))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
