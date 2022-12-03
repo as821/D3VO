@@ -9,7 +9,7 @@ class D3VO:
 		self.mp = Map()
 		self.nn = Networks()
 
-	def process_frame(self, frame, optimize=True):
+	def process_frame(self, frame, optimize=False):
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
 		and backend optimization (if optimize == True)."""
 		# TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)

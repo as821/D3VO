@@ -5,19 +5,26 @@ import numpy as np
 import argparse
 
 from d3vo import D3VO
-from display import display_trajectory
-from helper import calc_avg_matches, evaluate_pose
+from helper import calc_avg_matches 
+
+sys.path.insert(1, os.path.join(sys.path[0], '../kitti-odom-eval-master'))
+from kitti_odometry import KittiEvalOdom
 
 
 DEBUG = True
 PER_FRAME_ERROR = True
 
 
-def offline_vo(cap, gt_path, save_path):
+def offline_vo(cap, gt_path, save_path, out_dir):
 	"""Run D3VO on offline video"""
 	intrinsic = np.array([[F,0,W//2,0],[0,F,H//2,0],[0,0,1,0]])
 
 	d3vo = D3VO(intrinsic)
+
+	if gt_path != "":
+		eval = KittiEvalOdom(out_dir)
+		gt_poses = eval.load_poses_from_txt(gt_path)
+		pred_pose_kitti = {}
 
 	# Run D3VO offline with prerecorded video
 	i = 0
@@ -29,9 +36,6 @@ def offline_vo(cap, gt_path, save_path):
 			d3vo.process_frame(frame)
 
 			if DEBUG:
-				# plot all poses (invert poses so they move in correct direction)
-				display_trajectory([f.pose for f in d3vo.mp.frames])
-
 				# show keypoints with matches in this frame
 				for pidx, p in enumerate(d3vo.mp.frames[-1].kps):
 					if pidx in d3vo.mp.frames[-1].pts:
@@ -46,11 +50,16 @@ def offline_vo(cap, gt_path, save_path):
 				print("Matches: %d / %d (%f)" % (len(d3vo.mp.frames[-1].pts), len(d3vo.mp.frames[-1].kps), n_match))
 
 			# Run evaluation
-			if gt_path != "" and PER_FRAME_ERROR:
-				# Do not include identity pose of first frame in evaluation
-				ates = evaluate_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
-				if len(ates) > 0:
-					print("Trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
+			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
+				pred_pose_kitti[i] = d3vo.mp.frames[i].pose
+				ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
+				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
+				print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
+
+				if DEBUG and len(d3vo.mp.frames) % 25 == 0:
+					eval.plot_trajectory(gt_poses, pred_pose_kitti, 9)
+
+
 		else:
 			break
 		i += 1
@@ -63,8 +72,10 @@ def offline_vo(cap, gt_path, save_path):
 	# Final trajectory evaluation
 	if gt_path != "":
 		# Do not include identity pose of first frame in evaluation
-		ates = evaluate_pose(gt_path, [f.pose for f in d3vo.mp.frames[1:]])
-		print("\nTotal trajectory error: {:0.3f}, std: {:0.3f}\n".format(np.mean(ates), np.std(ates)))
+		ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
+		rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
+		print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
+
 
 	# Store pose predictions to a file (do not save identity pose of first frame)
 	save_path = os.path.join(save_path)
@@ -76,7 +87,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("path", type=str, help="path to the input video")
 	parser.add_argument("--gt", type=str, default="", help="path to .txt file with ground truth poses")
-	parser.add_argument("--out", type=str, default="poses.npy", help="path to output file to store pose predictions")
+	parser.add_argument("--save", type=str, default="poses.npy", help="path to output file to store pose predictions")
+	parser.add_argument("--out", type=str, help="path to output directory to store plots")
 	parser.add_argument("--focal", type=int, default=984, help="focal length of camera")
 	args = parser.parse_args()
 
@@ -97,7 +109,7 @@ if __name__ == "__main__":
 	print("using camera %dx%d with F %f" % (W,H,F))
 
 	# run offline visual odometry on provided video
-	offline_vo(cap, args.gt, args.out)
+	offline_vo(cap, args.gt, args.save, args.out)
 
 
 
