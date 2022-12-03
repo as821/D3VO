@@ -19,24 +19,24 @@ class D3VO:
 
 		# Run DepthNet to get depth map
 		depth = self.nn.depth(frame)
-
+		relative = None
 		if len(self.mp.frames) == 0:
 			# Set first frame pose to identity rotation and no translation. Uses homogenous 4x4 matrix
 			pose = np.eye(4)
 		else:
 			# Pass PoseNet the two most recent frames 
-			pose = self.nn.pose(self.mp.frames[-1].image, frame)
+			relative = self.nn.pose(self.mp.frames[-1].image, frame)
 
-			# if len(self.mp.frames) < 2:
-			# 	pose = relative
-			# else:
-			# 	pose = relative @ self.mp.frames[-1].pose
+			if len(self.mp.frames) > 1:
+				pose = np.dot(self.mp.frames[-1].pose, np.linalg.inv(relative))
+			else:
+				pose = np.linalg.inv(relative)
 
 		# Run frontend tracking
-		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
+		if not self.frontend(frame, depth, uncertainty, pose, relative, brightness_params):
 			return
 
-		if len(self.mp.keyframes) < 3:
+		if len(self.mp.keyframes) < 6:
 			return
 
 		# Run backend optimization
@@ -44,11 +44,11 @@ class D3VO:
 			self.mp.optimize(self.intrinsic)
 
 
-	def frontend(self, frame, depth, uncertainty, pose, brightness_params):
+	def frontend(self, frame, depth, uncertainty, pose, relative, brightness_params):
 		"""Run frontend tracking on the given frame --> just process every frame with a basic feature extractor for right now.
 		Return true to continue onto backend optimization"""
 		# create frame and add it to the map
-		f = Frame(self.mp, frame, depth, uncertainty, pose, brightness_params)
+		f = Frame(self.mp, frame, depth, uncertainty, pose, relative, brightness_params)
 
 		# cannot match first frame to any previous frames
 		if f.id == 0:
@@ -72,7 +72,7 @@ class D3VO:
 				pt.add_observation(prev_f, idx2)
 
 		# TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
-		if f.id % 3 == 0:
+		if f.id % 5 == 0:
 			self.mp.keyframes.append(f)
 			return True
 

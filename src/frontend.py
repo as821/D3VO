@@ -72,7 +72,7 @@ class Point:
 		
 
 class Frame:
-	def __init__(self, map, image, depth, uncertainty, pose, brightness_params):
+	def __init__(self, map, image, depth, uncertainty, pose, relative_pose, brightness_params):
 		self.id = map.add_frame(self)       # get an ID from the map
 		self.image = image
 
@@ -80,6 +80,7 @@ class Frame:
 		self.uncertainty = uncertainty
 		self.brightness_params = brightness_params
 		self.pose = pose
+		self.relative_pose = relative_pose
 
 		self.marginalize = False
 

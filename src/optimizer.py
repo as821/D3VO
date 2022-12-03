@@ -127,11 +127,13 @@ class Map:
 			f.pose[:3, 3] = est.translation()
 			#print(f.pose)
 
+		# Update poses of all frames between keyframes + after the last keyframe
+		self.recompute_global_poses()
+
+		# Remove marginalized keyframe
 		if self.keyframes[0].marginalize:
 			self.keyframes = self.keyframes[1:]
 
-
-		return
 		
 
 	def keypoints(self):
@@ -161,4 +163,17 @@ class Map:
 				keypoints[p] = local
 
 		return keypoints
+
+
+	def recompute_global_poses(self):
+		"""After a bundle adjustment, recompute relative poses of all frames that come after the first keyframe."""
+		for kf_idx in range(len(self.keyframes)):
+			# Adjust relative poses up to the next keyframe. If at the last keyframe, update to the end of the trajectory
+			start_idx = self.keyframes[kf_idx].id + 1
+			end_idx = self.keyframes[kf_idx + 1].id if kf_idx + 1 < len(self.keyframes) else len(self.frames)
+			prev = self.keyframes[kf_idx].pose
+			for idx in range(start_idx, end_idx):
+				frame = self.frames[idx]
+				prev = np.dot(prev, np.linalg.inv(frame.relative_pose))
+				frame.pose = prev
 

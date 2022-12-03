@@ -53,20 +53,12 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				# if i > 1:
-				# 	pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
-				# else:
-				# 	pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
-
 				# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
 				# This is likely an issue with the scale of DepthNet + PoseNet
 				translation_scale = 27
 				pred_pose_kitti = {}
 				for idx, f in enumerate(d3vo.mp.frames[1:]):		# recompute global every time to allow bundle adjustment changes to propagate
-					if idx > 1:
-						pred_pose_kitti[idx] = np.dot(pred_pose_kitti[idx-1], np.linalg.inv(d3vo.mp.frames[idx].pose))
-					else:
-						pred_pose_kitti[idx] = np.linalg.inv(f.pose)
+					pred_pose_kitti[idx] = deepcopy(f.pose)
 
 				for t in pred_pose_kitti:
 					pred_pose_kitti[t][:3, 3] *= translation_scale
