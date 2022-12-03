@@ -122,7 +122,6 @@ class Trainer:
             train_dataset, self.opt.batch_size, True, num_workers=self.opt.num_workers, pin_memory=True, drop_last=True
         )
 
-        # breakpoint()
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width, self.opt.frame_ids, 4, is_train=False, img_ext=img_ext
         )
@@ -245,7 +244,6 @@ class Trainer:
         if self.use_pose_net:
             outputs.update(self.predict_poses(inputs, features))
 
-        # breakpoint()
         self.generate_images_pred(inputs, outputs)
         losses = self.compute_losses(inputs, outputs)
 
@@ -395,19 +393,18 @@ class Trainer:
         """Computes reprojection loss between a batch of predicted and target images
         """
         abs_diff = torch.abs(target - pred)
-        l1_loss = abs_diff
+        l1_loss = abs_diff.mean(1, True)
 
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
         else:
-            # print(sigma.shape, self.ssim(pred, target).shape,pred.shape,target.shape)
-            # print()
-            ssim_loss = (self.ssim(pred, target)) / sigma + torch.log(sigma)
+            ssim_loss = (self.ssim(pred, target)).mean(1, True)
             reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
-            reprojection_loss = reprojection_loss / sigma + torch.log(sigma)
+            # Reference: https://github.com/no-Seaweed/Learning-Deep-Learning-1/blob/master/paper_notes/sfm_learner.md
+            transformed_sigma = (10 * sigma + 0.1)
+            reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
 
-        reprojection_loss = reprojection_loss.mean(1, True)
 
         return reprojection_loss
 
@@ -431,8 +428,6 @@ class Trainer:
             sigma = outputs[("disp-sigma", scale)]
             color = inputs[("color", 0, scale)]
             target = inputs[("color", 0, source_scale)]
-
-            # print(disp.shape,sigma.shape)
 
             for frame_id in self.opt.frame_ids[1:]:
                 pred = outputs[("color", frame_id, scale)]
@@ -497,7 +492,6 @@ class Trainer:
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
-            # breakpoint()
             smooth_loss = get_smooth_loss(norm_disp, color)
             
             reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)

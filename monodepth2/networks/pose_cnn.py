@@ -55,8 +55,8 @@ class PoseCNN(nn.Module):
         out_b = out_b.mean(3).mean(2)
 
         out_pose = 0.01 * out_pose.view(-1, self.num_input_frames - 1, 1, 6)
-        out_a = 0.01 * out_a.view(-1, self.num_input_frames - 1, 1, 1)
-        out_b = 0.01 * out_b.view(-1, self.num_input_frames - 1, 1, 1)
+        out_a = out_a.view(-1, self.num_input_frames - 1, 1, 1)
+        out_b = out_b.view(-1, self.num_input_frames - 1, 1, 1)
 
         axisangle = out_pose[..., :3]
         translation = out_pose[..., 3:]
