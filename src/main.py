@@ -53,25 +53,30 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				if i > 1:
-					pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
-				else:
-					pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
+				# if i > 1:
+				# 	pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
+				# else:
+				# 	pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
 
 				# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
 				# This is likely an issue with the scale of DepthNet + PoseNet
 				translation_scale = 27
-				eval_dict = deepcopy(pred_pose_kitti)
-				for t in eval_dict:
-					if t > 1:
-						eval_dict[t][:3, 3] *= translation_scale
+				pred_pose_kitti = {}
+				for idx, f in enumerate(d3vo.mp.frames[1:]):		# recompute global every time to allow bundle adjustment changes to propagate
+					if idx > 1:
+						pred_pose_kitti[idx] = np.dot(pred_pose_kitti[idx-1], np.linalg.inv(d3vo.mp.frames[idx].pose))
+					else:
+						pred_pose_kitti[idx] = np.linalg.inv(f.pose)
 
-				ate = eval.compute_ATE(gt_poses, eval_dict)
-				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
+				for t in pred_pose_kitti:
+					pred_pose_kitti[t][:3, 3] *= translation_scale
+
+				ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
+				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
 				print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
 
 				if DEBUG and len(d3vo.mp.frames) % 10 == 0:
-					eval.plot_trajectory(gt_poses, eval_dict, 9)
+					eval.plot_trajectory(gt_poses, pred_pose_kitti, 9)
 		else:
 			break
 		i += 1
