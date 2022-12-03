@@ -2,6 +2,7 @@ from optimizer import Map
 from frontend import Frame, Point, match_frame_kps
 from depth_pose_net import Networks
 import numpy as np
+from copy import deepcopy
 
 class D3VO:
 	def __init__(self, intrinsic):
@@ -19,24 +20,24 @@ class D3VO:
 
 		# Run DepthNet to get depth map
 		depth = self.nn.depth(frame)
-		relative = None
+
 		if len(self.mp.frames) == 0:
 			# Set first frame pose to identity rotation and no translation. Uses homogenous 4x4 matrix
 			pose = np.eye(4)
 		else:
 			# Pass PoseNet the two most recent frames 
-			relative = self.nn.pose(self.mp.frames[-1].image, frame)
+			pose = self.nn.pose(self.mp.frames[-1].image, frame)
 
-			if len(self.mp.frames) > 1:
-				pose = np.dot(self.mp.frames[-1].pose, np.linalg.inv(relative))
-			else:
-				pose = np.linalg.inv(relative)
+			# if len(self.mp.frames) < 2:
+			# 	pose = relative
+			# else:
+			# 	pose = relative @ self.mp.frames[-1].pose
 
 		# Run frontend tracking
-		if not self.frontend(frame, depth, uncertainty, pose, relative, brightness_params):
+		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
 			return
 
-		if len(self.mp.keyframes) < 6:
+		if len(self.mp.keyframes) < 3:
 			return
 
 		# Run backend optimization
@@ -44,11 +45,11 @@ class D3VO:
 			self.mp.optimize(self.intrinsic)
 
 
-	def frontend(self, frame, depth, uncertainty, pose, relative, brightness_params):
+	def frontend(self, frame, depth, uncertainty, pose, brightness_params):
 		"""Run frontend tracking on the given frame --> just process every frame with a basic feature extractor for right now.
 		Return true to continue onto backend optimization"""
 		# create frame and add it to the map
-		f = Frame(self.mp, frame, depth, uncertainty, pose, relative, brightness_params)
+		f = Frame(self.mp, frame, depth, uncertainty, pose, brightness_params)
 
 		# cannot match first frame to any previous frames
 		if f.id == 0:
@@ -72,8 +73,29 @@ class D3VO:
 				pt.add_observation(prev_f, idx2)
 
 		# TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
-		if f.id % 5 == 0:
+		if f.id % 3 == 0:
 			self.mp.keyframes.append(f)
 			return True
 
 		return False
+
+
+	def relative_to_global(self):
+		gbl = []
+		for idx, f in enumerate(self.mp.frames):
+			if idx > 1:
+				gbl.append(np.dot(gbl[-1], np.linalg.inv(f.pose)))
+			else:
+				gbl.append(np.linalg.inv(f.pose))
+		return gbl
+
+
+	def convert_dict_for_eval(self, inp_dict):
+		# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
+		# This is likely an issue with the scale of DepthNet + PoseNet
+		translation_scale = 27
+		eval_dict = deepcopy(inp_dict)
+		for t in eval_dict:
+			if t > 1:
+				eval_dict[t][:3, 3] *= translation_scale
+		return eval_dict

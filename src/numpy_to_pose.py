@@ -16,6 +16,18 @@ def numpy_to_kitti(pose):
 
 
 
+def relative_to_global(poses):
+    """Convert relative poses to global poses"""
+    global_poses = []
+    for idx, p in enumerate(poses):
+        if idx == 0:
+            global_poses.append(p)
+        elif idx == 1:
+            global_poses.append(np.linalg.inv(p))
+        else:
+            global_poses.append(np.dot(global_poses[-1], np.linalg.inv(p)))
+    return global_poses
+
 
 
 if __name__ == "__main__":

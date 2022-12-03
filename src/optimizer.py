@@ -1,6 +1,4 @@
 from frontend import Point, Frame
-from helper import project, unproject
-
 import numpy as np
 import g2o
 
@@ -21,7 +19,6 @@ class Map:
 
 	def add_frame(self, frame):
 		"""Add a Frame to the Map"""
-		# TODO assumes no frame removal in ID assignment
 		assert (type(frame) == Frame)
 		ret = self.frame_idx
 		self.frame_idx += 1
@@ -30,16 +27,15 @@ class Map:
 
 	def add_point(self, pt):
 		"""Add a Point to the Map"""
-		# TODO assumes no point removal in ID assignment
 		assert (type(pt) == Point)
 		ret = self.pt_idx
 		self.pt_idx += 1
 		self.points.append(pt)
 		return ret
 
-	def optimize(self, intrinsic, iter=6, verbose=True):
+	def optimize(self, intrinsic, iter=6, verbose=False):
 		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
-		# create optimizer (TODO just following example, likely incorrect for D3VO)
+		# create optimizer
 		opt = g2o.SparseOptimizer()
 		solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
 		solver = g2o.OptimizationAlgorithmLevenberg(solver)
@@ -59,7 +55,6 @@ class Map:
 
 		if len(self.keyframes) >= 7:
 			self.keyframes[0].marginalize = True
-
 
 		# set up frames as vertices
 		for idx, f in enumerate(self.keyframes):
@@ -127,13 +122,8 @@ class Map:
 			f.pose[:3, 3] = est.translation()
 			#print(f.pose)
 
-		# Update poses of all frames between keyframes + after the last keyframe
-		self.recompute_global_poses()
-
-		# Remove marginalized keyframe
 		if self.keyframes[0].marginalize:
 			self.keyframes = self.keyframes[1:]
-
 		
 
 	def keypoints(self):
@@ -163,17 +153,4 @@ class Map:
 				keypoints[p] = local
 
 		return keypoints
-
-
-	def recompute_global_poses(self):
-		"""After a bundle adjustment, recompute relative poses of all frames that come after the first keyframe."""
-		for kf_idx in range(len(self.keyframes)):
-			# Adjust relative poses up to the next keyframe. If at the last keyframe, update to the end of the trajectory
-			start_idx = self.keyframes[kf_idx].id + 1
-			end_idx = self.keyframes[kf_idx + 1].id if kf_idx + 1 < len(self.keyframes) else len(self.frames)
-			prev = self.keyframes[kf_idx].pose
-			for idx in range(start_idx, end_idx):
-				frame = self.frames[idx]
-				prev = np.dot(prev, np.linalg.inv(frame.relative_pose))
-				frame.pose = prev
 

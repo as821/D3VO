@@ -3,7 +3,6 @@ import cv2
 import os
 import numpy as np
 import argparse
-from copy import deepcopy
 
 from d3vo import D3VO
 from helper import calc_avg_matches 
@@ -23,7 +22,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 	d3vo = D3VO(intrinsic)
 
 	if gt_path != "":
-		# Use open source KITTI evaluation code. Monodepth2 evaluation code is incorrect
+		# Use open source KITTI evaluation code, requires poses in form of a dictionary
 		eval = KittiEvalOdom(out_dir)
 		gt_poses = eval.load_poses_from_txt(gt_path)
 		pred_pose_kitti = {}
@@ -53,22 +52,18 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
-				# This is likely an issue with the scale of DepthNet + PoseNet
-				translation_scale = 27
-				pred_pose_kitti = {}
-				for idx, f in enumerate(d3vo.mp.frames[1:]):		# recompute global every time to allow bundle adjustment changes to propagate
-					pred_pose_kitti[idx] = deepcopy(f.pose)
+				if i > 1:
+					pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
+				else:
+					pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
 
-				for t in pred_pose_kitti:
-					pred_pose_kitti[t][:3, 3] *= translation_scale
-
-				ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
-				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
+				eval_dict = d3vo.convert_dict_for_eval(pred_pose_kitti)
+				ate = eval.compute_ATE(gt_poses, eval_dict)
+				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
 				print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
 
 				if DEBUG and len(d3vo.mp.frames) % 10 == 0:
-					eval.plot_trajectory(gt_poses, pred_pose_kitti, 9)
+					eval.plot_trajectory(gt_poses, eval_dict, 9)
 		else:
 			break
 		i += 1
@@ -79,16 +74,17 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 				break
 	
 	# Final trajectory evaluation
+	eval_dict = d3vo.convert_dict_for_eval(pred_pose_kitti)
 	if gt_path != "":
-		# Do not include identity pose of first frame in evaluation
-		ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
-		rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
+		ate = eval.compute_ATE(gt_poses, eval_dict)
+		rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
 		print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
+		eval.plot_trajectory(gt_poses, eval_dict, 9)
 
 
 	# Store pose predictions to a file (do not save identity pose of first frame)
 	save_path = os.path.join(save_path)
-	np.save(save_path, [f.pose for f in d3vo.mp.frames[1:]])
+	np.save(save_path, [eval_dict[i] for i in eval_dict])
 	print("-> Predictions saved to", save_path)
 
 
