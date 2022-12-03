@@ -3,6 +3,7 @@ import cv2
 import os
 import numpy as np
 import argparse
+from copy import deepcopy
 
 from d3vo import D3VO
 from helper import calc_avg_matches 
@@ -22,6 +23,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 	d3vo = D3VO(intrinsic)
 
 	if gt_path != "":
+		# Use open source KITTI evaluation code. Monodepth2 evaluation code is incorrect
 		eval = KittiEvalOdom(out_dir)
 		gt_poses = eval.load_poses_from_txt(gt_path)
 		pred_pose_kitti = {}
@@ -51,15 +53,25 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				pred_pose_kitti[i] = d3vo.mp.frames[i].pose
-				ate = eval.compute_ATE(gt_poses, pred_pose_kitti)
-				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, pred_pose_kitti)
+				if i > 1:
+					pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
+				else:
+					pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
+
+				# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
+				# This is likely an issue with the scale of DepthNet + PoseNet
+				translation_scale = 27
+				eval_dict = deepcopy(pred_pose_kitti)
+				for t in eval_dict:
+					if t > 1:
+						eval_dict[t][:3, 3] *= translation_scale
+
+				ate = eval.compute_ATE(gt_poses, eval_dict)
+				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
 				print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
 
-				if DEBUG and len(d3vo.mp.frames) % 25 == 0:
-					eval.plot_trajectory(gt_poses, pred_pose_kitti, 9)
-
-
+				if DEBUG and len(d3vo.mp.frames) % 10 == 0:
+					eval.plot_trajectory(gt_poses, eval_dict, 9)
 		else:
 			break
 		i += 1

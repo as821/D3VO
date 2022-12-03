@@ -9,7 +9,7 @@ class D3VO:
 		self.mp = Map()
 		self.nn = Networks()
 
-	def process_frame(self, frame, optimize=False):
+	def process_frame(self, frame, optimize=True):
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
 		and backend optimization (if optimize == True)."""
 		# TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)
@@ -25,7 +25,7 @@ class D3VO:
 			pose = np.eye(4)
 		else:
 			# Pass PoseNet the two most recent frames 
-			pose = self.nn.pose(self.mp.frames[-1].image, frame) #np.random.rand(1) * np.eye(4)
+			pose = self.nn.pose(self.mp.frames[-1].image, frame)
 
 			# if len(self.mp.frames) < 2:
 			# 	pose = relative
