@@ -29,16 +29,8 @@ class D3VO:
 			# Pass PoseNet the two most recent frames 
 			pose = self.nn.pose(self.mp.frames[-1].image, frame)
 
-			# if len(self.mp.frames) < 2:
-			# 	pose = relative
-			# else:
-			# 	pose = relative @ self.mp.frames[-1].pose
-
 		# Run frontend tracking
 		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
-			return
-
-		if len(self.mp.keyframes) < 3:
 			return
 
 		# Run backend optimization
@@ -52,8 +44,9 @@ class D3VO:
 		# create frame and add it to the map
 		f = Frame(self.mp, frame, depth, uncertainty, pose, brightness_params)
 
-		# cannot match first frame to any previous frames
+		# cannot match first frame to any previous frames (but make it a keyframe)
 		if f.id == 0:
+			self.mp.check_add_key_frame(f, np.vstack([self.intrinsic, [0, 0, 0, 1]]))
 			return False
 
 		# TODO this should be done with DSO's feature extractor/matching approach, this is just to enable backend work
@@ -73,9 +66,9 @@ class D3VO:
 				pt.add_observation(f, idx1)
 				pt.add_observation(prev_f, idx2)
 
-		# TODO should we also be handling unmatched points in case they show up in later frames?? --> probably not, this is effectively loop closure
-		if f.id % 3 == 0:
-			self.mp.keyframes.append(f)
+		# Check if this new frame should be a keyframe
+		if self.mp.check_add_key_frame(f,  np.vstack([self.intrinsic, [0, 0, 0, 1]])):
+			# Keyframe has been added, run backend optimization
 			return True
 
 		return False
