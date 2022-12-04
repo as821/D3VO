@@ -51,24 +51,28 @@ class Map:
 
 	def marginalize(self):
 		"""Check if any of the keyframes are ready for marginalization"""
-		latest_key_frame = self.keyframes[-1]
-		max_dist = 0
-		max_dist_idx = 0
-		marginalized_count = 0
+		# latest_key_frame = self.keyframes[-1]
+		# max_dist = 0
+		# max_dist_idx = 0
+		# marginalized_count = 0
 
-		# Can marginalize everything apart from the last two keyframes:
-		for i in range(len(self.keyframes) - 1):
-			l1, l2 = match_frame_kps(latest_key_frame, self.keyframes[i])
-			if len(l2) / len(self.keyframes[i].kps) < 0.1:
-				self.keyframes[i].marginalize = True
-				marginalized_count += 1
-			frame_dist = np.linalg.norm(latest_key_frame.image - self.keyframes[i].image)
-			if frame_dist > max_dist:
-				max_dist = frame_dist
-				max_dist_idx = i
+		# # Can marginalize everything apart from the last two keyframes:
+		# for i in range(len(self.keyframes) - 1):
+		# 	l1, l2 = match_frame_kps(latest_key_frame, self.keyframes[i])
+		# 	if len(l2) / len(self.keyframes[i].kps) < 0.1:
+		# 		self.keyframes[i].marginalize = True
+		# 		marginalized_count += 1
+		# 	frame_dist = np.linalg.norm(latest_key_frame.image - self.keyframes[i].image)
+		# 	if frame_dist > max_dist:
+		# 		max_dist = frame_dist
+		# 		max_dist_idx = i
 
-		if len(self.keyframes) > self.num_kf and marginalized_count == 0:
-			self.keyframes[max_dist_idx].marginalize = True
+		# if len(self.keyframes) > self.num_kf and marginalized_count == 0:
+		# 	self.keyframes[max_dist_idx].marginalize = True
+
+		if len(self.keyframes) > self.num_kf:
+			self.keyframes[0].marginalize = True
+
 
 	def check_key_frame(self, frame):
 		last_key_frame = self.keyframes[-1]
@@ -150,6 +154,8 @@ class Map:
 				v_se3.set_fixed(True)       # Hold first frame constant
 
 			if f.marginalize:
+				# optimization library crashes if we marginalize a frame that is not at the beginning of the window (oldest keyframe)
+				assert idx == 0				
 				v_se3.set_marginalized(True)
 
 			opt.add_vertex(v_se3)
@@ -187,39 +193,40 @@ class Map:
 				opt.add_edge(edge)
 
 		# run optimizer
-		opt.initialize_optimization()
-		opt.optimize(iter)
+		if len(kpts) > 0:
+			opt.initialize_optimization()
+			opt.optimize(iter)
 
-		# store optimization results 
-		for p in kpts:
-			# optimization gives unprojected point in 3D
-			est = opt_pts[p].estimate()
-			assert est >= 0
-			p.update_host_depth(est)
-			# print(est)
-	
-		for f in self.keyframes:
-			est = opt_frames[f].estimate()
-			f.pose = np.eye(4)
-			f.pose[:3, :3] = est.rotation().matrix()
-			f.pose[:3, 3] = est.translation()
-			#print(f.pose)
-
-		# TODO(as) need to adjust this! if a keyframe is marginalized, must remove all points inside of it from any other keyframes
-		# TODO(as) also need to handle marginalization of keyframes in the middle of the window, not just at the end
-		if self.keyframes[0].marginalize:
-			self.keyframes = self.keyframes[1:]
+			# store optimization results 
+			for p in kpts:
+				# optimization gives unprojected point in 3D
+				est = opt_pts[p].estimate()
+				assert est >= 0
+				p.update_host_depth(est)
+				# print(est)
 		
+			for idx, f in enumerate(self.keyframes):
+				est = opt_frames[f].estimate()
+				f.pose = np.eye(4)
+				f.pose[:3, :3] = est.rotation().matrix()
+				f.pose[:3, 3] = est.translation()
+
+			# Library only supports marginalizing keyframe at the beginning of the window (oldest keyframe)
+			if self.keyframes[0].marginalize:
+				self.keyframes = self.keyframes[1:]
+				# Mark all points in a marginalized frame as invalid
+				for pt in f.pts.values():
+					pt.valid = False
 
 	def keypoints(self):
 		"""Return a list of the points that originate in a keyframe and connect to other keyframes"""
-		# Pretend that all points in the oldest keyframe originate in that keyframe
-		candidate = list(self.keyframes[0].pts.values())
+		# Pretend that all valid points in the oldest keyframe originate in that keyframe
+		candidate = [p for p in list(self.keyframes[0].pts.values()) if p.valid]
 
 		# Find set of all points that originate a keyframe (ignoring the last keyframe)
 		for f in self.keyframes[1:-1]:
 			for pt in f.pts.values():
-				if pt.frames[0] == f:
+				if pt.frames[0] == f and pt.valid:
 					# If this frame is the point's host frame, make it a candidate
 					candidate.append(pt)
 

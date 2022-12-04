@@ -51,6 +51,7 @@ class Point:
 		self.frames = []        # set of keyframes where this point is visible
 		self.idxs = []          # index for the kps/des lists of the corresponding frame. Parallel list to self.frames
 		self.id = map.add_point(self)
+		self.valid = True       # point becomes invalid when a Frame it appears in is marginalized
 	
 	def get_host_frame(self):
 		# Host frame for this point is the first frame it is observed in
