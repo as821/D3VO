@@ -35,12 +35,12 @@ class Map:
 		self.points.append(pt)
 		return ret
 
-	def check_add_key_frame(self, frame, intrinsics):
+	def check_add_key_frame(self, frame):
 		"""Check if the given Frame is a keyframe, if so add to list and evaluate marginalization."""
 		if frame.id == 0:
 			key_frame = True
 		else:
-			key_frame = self.check_key_frame(frame, intrinsics)
+			key_frame = self.check_key_frame(frame)
 
 		if key_frame:
 			self.keyframes.append(frame)
@@ -69,7 +69,7 @@ class Map:
 		if len(self.keyframes) > self.num_kf and marginalized_count == 0:
 			self.keyframes[max_dist_idx].marginalize = True
 
-	def check_key_frame(self, frame, intrinsics):
+	def check_key_frame(self, frame):
 		last_key_frame = self.frames[-1]
 		w_a = 0.0
 		w_f = 0.6
@@ -84,9 +84,9 @@ class Map:
 		# of the intrinsic and taking just the first 3 rows and first 3
 		# columns.
 		# The homography is then given by R1 @ inv(R2) @ inv(K)
-		R1 = (np.linalg.inv(intrinsics) @ last_key_frame.pose[:3, :])[:3, :3]
-		R2 = (np.linalg.inv(intrinsics) @ frame.pose[:3, :])[:3, :3]
-		homography_t = intrinsics[:3,:3] @ R1 @ np.linalg.inv(R2) @ np.linalg.inv(intrinsics[:3,:3])
+		R1 = last_key_frame.pose[:3, :3]
+		R2 = frame.pose[:3, :3]
+		homography_t =  R1 @ np.linalg.inv(R2)
 
 		f = 0
 		ft = 0

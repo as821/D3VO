@@ -46,7 +46,7 @@ class D3VO:
 
 		# cannot match first frame to any previous frames (but make it a keyframe)
 		if f.id == 0:
-			self.mp.check_add_key_frame(f, self.intrinsic[:3, :3])
+			self.mp.check_add_key_frame(f)
 			return False
 
 		# TODO this should be done with DSO's feature extractor/matching approach, this is just to enable backend work
@@ -67,7 +67,7 @@ class D3VO:
 				pt.add_observation(prev_f, idx2)
 
 		# Check if this new frame should be a keyframe
-		if self.mp.check_add_key_frame(f,  self.intrinsic[:3, :3]):
+		if self.mp.check_add_key_frame(f):
 			# Keyframe has been added, run backend optimization
 			return True
 
