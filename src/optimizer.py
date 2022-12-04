@@ -8,12 +8,13 @@ from frontend import match_frame_kps
 
 class Map:
 	"""Class to store and optimize over all current frames, points, etc."""
-	def __init__(self, alpha=0.5, num_kf=7):
+	def __init__(self, alpha=0.5, num_kf=7, trajectory_scale = 27):
 		self.frames = []
 		self.points = []
 		self.keyframes = []
 		self.frame_idx = self.pt_idx = 0
 		self.num_kf = num_kf
+		self.trajectory_scale = trajectory_scale
 		
 		# Optimization hyperparameter for weighting uncertainty of a pixel (D3VO Eq. 13)
 		self.alpha = alpha
@@ -70,7 +71,7 @@ class Map:
 			self.keyframes[max_dist_idx].marginalize = True
 
 	def check_key_frame(self, frame):
-		last_key_frame = self.frames[-1]
+		last_key_frame = self.keyframes[-1]
 		w_a = 0.0
 		w_f = 0.6
 		w_ft = 0.4
@@ -84,8 +85,13 @@ class Map:
 		# of the intrinsic and taking just the first 3 rows and first 3
 		# columns.
 		# The homography is then given by R1 @ inv(R2) @ inv(K)
-		R1 = last_key_frame.pose[:3, :3]
-		R2 = frame.pose[:3, :3]
+		global_poses = self.relative_to_global()
+		if last_key_frame.id == 0:
+			# Relative to global does not include the identity pose for the first frame, indices are off by 1 compared to IDs
+			R1 = np.eye(3)
+		else:
+			R1 = global_poses[last_key_frame.id - 1][:3, :3]
+		R2 = global_poses[frame.id - 1][:3, :3]
 		homography_t =  R1 @ np.linalg.inv(R2)
 
 		f = 0
@@ -232,4 +238,17 @@ class Map:
 				keypoints[p] = local
 
 		return keypoints
+
+	def relative_to_global(self):
+		"""Convert relative pose stored in frames into a global pose."""
+		pred_pose = []
+		for idx, f in enumerate(self.frames[1:]):		
+			if idx > 1:
+				pred_pose.append(np.dot(pred_pose[idx-1], np.linalg.inv(self.frames[idx].pose)))
+			else:
+				pred_pose.append(np.linalg.inv(f.pose))
+
+		for t in range(len(pred_pose)):
+			pred_pose[t][:3, 3] *= self.trajectory_scale
+		return pred_pose
 

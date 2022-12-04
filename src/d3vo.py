@@ -2,14 +2,12 @@ from optimizer import Map
 from frontend import Frame, Point, match_frame_kps
 from depth_pose_net import Networks
 import numpy as np
-from copy import deepcopy
 
 class D3VO:
-	def __init__(self, intrinsic, trajectory_scale=27):
+	def __init__(self, intrinsic):
 		self.intrinsic = intrinsic
 		self.mp = Map()
 		self.nn = Networks()
-		self.trajectory_scale = trajectory_scale
 
 	def process_frame(self, frame, optimize=True):
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
@@ -74,24 +72,10 @@ class D3VO:
 		return False
 
 
-	def relative_to_global(self):
-		"""Convert relative pose stored in frames into a global pose."""
-		pred_pose = []
-		for idx, f in enumerate(self.mp.frames[1:]):		
-			if idx > 1:
-				pred_pose.append(np.dot(pred_pose[idx-1], np.linalg.inv(self.mp.frames[idx].pose)))
-			else:
-				pred_pose.append(np.linalg.inv(f.pose))
-
-		for t in range(len(pred_pose)):
-			pred_pose[t][:3, 3] *= self.trajectory_scale
-		return pred_pose
-
-
 	def run_eval(self, gt_pose, eval, plot_traj=False):
 		"""Evaluate the performance of D3VO compared to the ground truth poses provided and print result."""
 		# recompute global poses from stored relative poses every time to allow bundle adjustment changes to propagate
-		pred_pose = {idx+1 : p for idx, p in enumerate(self.relative_to_global())}
+		pred_pose = {idx+1 : p for idx, p in enumerate(self.mp.relative_to_global())}
 		ate = eval.compute_ATE(gt_pose, pred_pose)
 		rpe_trans, rpe_rot = eval.compute_RPE(gt_pose, pred_pose)
 		print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)

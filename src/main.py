@@ -69,7 +69,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 	# Store pose predictions to a file (do not save identity pose of first frame)
 	save_path = os.path.join(save_path)
-	np.save(save_path, d3vo.relative_to_global())
+	np.save(save_path, d3vo.mp.relative_to_global())
 	print("-> Predictions saved to", save_path)
 
 
