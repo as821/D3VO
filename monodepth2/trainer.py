@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+from torchvision.utils import save_image
+
 
 import json
 
@@ -211,11 +213,11 @@ class Trainer:
                     self.compute_depth_losses(inputs, outputs, losses)
 
                 self.log("train", inputs, outputs, losses)
-                self.val()
+                self.val(self.epoch * 10 + batch_idx)
 
             self.step += 1
 
-    def process_batch(self, inputs):
+    def process_batch(self, inputs, batch_idx = -1):
         """Pass a minibatch through the network and generate images and losses
         """
         for key, ipt in inputs.items():
@@ -245,7 +247,7 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features))
 
         self.generate_images_pred(inputs, outputs)
-        losses = self.compute_losses(inputs, outputs)
+        losses = self.compute_losses(inputs, outputs, batch_idx)
 
         return outputs, losses
 
@@ -319,7 +321,7 @@ class Trainer:
 
         return outputs
 
-    def val(self):
+    def val(self, batch_idx):
         """Validate the model on a single minibatch
         """
         self.set_eval()
@@ -330,7 +332,7 @@ class Trainer:
             inputs = next(self.val_iter)
 
         with torch.no_grad():
-            outputs, losses = self.process_batch(inputs)
+            outputs, losses = self.process_batch(inputs, batch_idx)
 
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
@@ -402,13 +404,13 @@ class Trainer:
             reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
             # Reference: https://github.com/no-Seaweed/Learning-Deep-Learning-1/blob/master/paper_notes/sfm_learner.md
-            transformed_sigma = (10 * sigma + 0.1)
+            # transformed_sigma = (10 * sigma + 0.1)
+            transformed_sigma = sigma + 0.001
             reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
-
 
         return reprojection_loss
 
-    def compute_losses(self, inputs, outputs):
+    def compute_losses(self, inputs, outputs, batch_idx=-1):
         """Compute the reprojection and smoothness losses for a minibatch
         """
         losses = {}
@@ -434,6 +436,10 @@ class Trainer:
                 a = outputs[("a", 0, frame_id)].unsqueeze(1)
                 b = outputs[("b", 0, frame_id)].unsqueeze(1)
                 target_frame = target * a + b
+                if batch_idx != -1:
+                    save_image(target_frame[-1], f'val_images/target_frame_{self.step}.jpeg')
+                    save_image(target[-1], f'val_images/target_{self.step}.jpeg')
+
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame, sigma))
                 ab_losses.append((a - 1) ** 2 + b ** 2)
 
@@ -499,6 +505,7 @@ class Trainer:
             
             reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)
 
+            #loss += torch.mean((sigma - 1) ** 2)
             loss += self.opt.disparity_smoothness * reg_loss / (2 ** scale)
 
             total_loss += loss
