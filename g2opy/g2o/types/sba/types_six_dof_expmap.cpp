@@ -661,37 +661,8 @@ void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
 
 
 
-bool EdgeProjectD3VO::write(std::ostream& os) const  {
-    // os << _cam->id() << " ";
-    // for (int i=0; i<2; i++){
-    //     os << measurement()[i] << " ";
-    // }
-
-    // for (int i=0; i<2; i++)
-    //     for (int j=i; j<2; j++){
-    //     os << " " <<  information()(i,j);
-    //     }
-    return os.good();
-}
-
-bool EdgeProjectD3VO::read(std::istream& is) {
-    // int paramId;
-    // is >> paramId;
-    // setParameterId(0, paramId);
-
-    // for (int i=0; i<2; i++){
-    //     is >> _measurement[i];
-    // }
-    // for (int i=0; i<2; i++)
-    //     for (int j=i; j<2; j++) {
-    //     is >> information()(i,j);
-    //     if (i!=j)
-    //         information()(j,i)=information()(i,j);
-    //     }
-    return true;
-}
-
 void EdgeProjectD3VO::computeError(){
+    /* Compute the D3VO loss. */
     const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
     const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
     const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
@@ -710,6 +681,7 @@ void EdgeProjectD3VO::computeError(){
     int host_base_idx = (int)pt->uv(0) * Y * Z + Z * (int)pt->uv(1);
     int dest_base_idx = (int)p_prime(0) * Y * Z + Z * (int)p_prime(1);
 
+    // Check that the reprojection is not outside of the frame. Also sanity checks the original point is valid.
     if(host_base_idx + 2 >= X*Y*Z || dest_base_idx + 2 >= X*Y*Z || host_base_idx < 0 || dest_base_idx < 0) {
         _error.setZero();
         out_of_bounds = true;
@@ -719,6 +691,7 @@ void EdgeProjectD3VO::computeError(){
         out_of_bounds = false;
     }
 
+    // Compute photometric error
     Vector3D host_inten(host_img[host_base_idx], host_img[host_base_idx+1], host_img[host_base_idx+2]);
     Vector3D dest_inten(dest_img[dest_base_idx], dest_img[dest_base_idx+1], dest_img[dest_base_idx+2]);
     _error = dest_inten - host_inten;
@@ -727,6 +700,7 @@ void EdgeProjectD3VO::computeError(){
 
 
 void EdgeProjectD3VO::linearizeOplus(){
+    /* Implements the Jacobian of the D3VO loss. */
     // General resource for DSO Jacobian derivation
     // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
     // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
@@ -794,12 +768,12 @@ void EdgeProjectD3VO::linearizeOplus(){
 
     // d X / d depth
     Vector3D unprojected = cam->cam_unmap(pt->uv, depth) / depth;
-    Vector3D dx_dd = unprojected_X / depth;          // rather than recomputing, just subtract by depth since it is a scalar and commutes through matrix-vector operations
+    Vector3D dx_dd = unprojected_X / depth;       
 
     // d p' / d depth
     Vector2D dprime_ddepth = dprime_dX * dx_dd;
 
-    // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth) --> need a dot product
+    // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth)  (dot product, not multiplication)
     Eigen::Matrix<double,1,1> J_depth = J_Ij.transpose() * dprime_ddepth;
 
     // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
@@ -809,25 +783,8 @@ void EdgeProjectD3VO::linearizeOplus(){
 
     // d X / d (T_j * T_i^{-1})
     Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
-
-    // Separate this relative pose Jacobian (T_j * T_i^{-1}) into Jacobians for T_i and T_j using the adjoint transformation
-    // https://ethaneade.com/lie.pdf (pg4/5)
-    // https://www.cnblogs.com/JingeTU/p/8306727.html 
-    // https://www.ethaneade.com/latex2html/lie/node17.html --> Adjoint of a matrix in SE(3)
-    Eigen::Matrix<double, 3, 3> R_th = T_host_dest.rotation().matrix();  
-    Eigen::Matrix<double, 1, 3> t_th = T_host_dest.translation();
-    Eigen::Matrix<double, 3, 3> cross_t_th = skew(t_th);     // Eigen has no unary cross product operator??
-    Eigen::Matrix<double, 3, 3> zero;
-    zero.setZero();
-
-    // Assemble Ad_{T_{th}}
-    Eigen::Matrix<double,6,6> host_adjoint;
-    host_adjoint << R_th, cross_t_th * R_th,
-                    zero, R_th;
-
-    // Calculate separated Jacobians for host and target frames
-    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose * -host_adjoint;   // (d p_prime / d(target -> host)) (d(target -> host) / d host)
-    Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;   // adjoint of target frame is the identity
+    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose;
+    Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;  
 
     // Calculate full host and target frame Jacobians by incorporating image pixel gradients
     Eigen::Matrix<double,1,6> J_host_T = J_Ij.transpose() * J_host_p_prime;

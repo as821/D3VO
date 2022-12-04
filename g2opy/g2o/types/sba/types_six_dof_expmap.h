@@ -341,7 +341,9 @@ class EdgeStereoSE3ProjectXYZOnlyPose : public BaseUnaryEdge<3, Vector3D, Vertex
 
 
 
-// 3-way edge between two Frames and a Point
+/*
+An Edge to implement the D3VO photometric error. Connects to a VertexD3VOPointDepth and two VertexD3VOFramePose.
+*/
 class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D>
 {
     public:
@@ -353,8 +355,8 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
             out_of_bounds = false;
         }
 
-        virtual bool read(std::istream& is);
-        virtual bool write(std::ostream& os) const;
+        virtual bool read(std::istream& is) {return false;}
+        virtual bool write(std::ostream& os) const {return false;}
         void computeError();
         virtual void linearizeOplus();
         CameraParameters * _cam;
@@ -362,6 +364,9 @@ class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D
 };
 
 
+/*
+A Vertex type to represent a single point depth estimate. The depth estimate for this vertex comes from its host frame.
+*/
 class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -400,13 +405,14 @@ class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
 
 
 
-/**
- * \brief SE3 Vertex parameterized internally with a transformation matrix
- and externally with its exponential map
+/*
+A SE3 Vertex parameterized internally with a transformation matrix and externally with its exponential map used to 
+represent the pose of a single Frame. This vertex also stores the image of the frame it represents in order to 
+implement a photometric error.
  
- Inspired by VertexSE3Expmap. Has slightly worse performance than using Isometry3D (inspired by VertexSE3), 
- but optimization is much more stable and matches the exponential map we expect to see in the pose update.
- */
+Inspired by VertexSE3Expmap. SE3Quat slightly worse performance than using Isometry3D (inspired by VertexSE3), 
+but optimization is much more stable and matches the exponential map we expect to see in the pose update.
+*/
 class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
 {
     public:
@@ -421,7 +427,6 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
 
             // Process + store input numpy array
             pixel_inten = pixel_intensity.request();
-            // std::cout << "Frame dim: (" <<  pixel_inten.shape[0] << ", " << pixel_inten.shape[1] << ", " << pixel_inten.shape[2] << ")" << std::endl;
         }
 
         virtual void setToOriginImpl() {
@@ -438,12 +443,6 @@ class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
     virtual bool write (std::ostream& os) const {return false;}
 
 };
-
-
-
-
-
-
 } // end namespace
 
 #endif

@@ -132,6 +132,7 @@ void declareTypesSixDofExpmap(py::module & m) {
 
 
 void declareD3VO(py::module & m) {
+    // Expose classes and methods to Python implementation
     py::class_<EdgeProjectD3VO, BaseMultiEdge<3, Vector3D>>(m, "EdgeProjectD3VO")
         .def(py::init())
         .def("compute_error", &EdgeProjectD3VO::computeError)
@@ -141,7 +142,7 @@ void declareD3VO(py::module & m) {
     py::class_<VertexD3VOPointDepth, BaseVertex<1, double>>(m, "VertexD3VOPointDepth")
         .def(py::init<const int, const int>())
         .def("set_to_origin_impl", &VertexD3VOPointDepth::setToOriginImpl)
-        .def("oplus_impl", &VertexD3VOPointDepth::oplusImpl)    // double* -> void
+        .def("oplus_impl", &VertexD3VOPointDepth::oplusImpl)
         .def("set_estimate", &VertexD3VOPointDepth::setEstimateDataImpl)
         .def("get_estimate", &VertexD3VOPointDepth::getEstimateData)
     ;
@@ -149,7 +150,7 @@ void declareD3VO(py::module & m) {
     py::class_<VertexD3VOFramePose, BaseVertex<6, SE3Quat>>(m, "VertexD3VOFramePose")
         .def(py::init<py::array_t<double>>())
         .def("set_to_origin_impl", &VertexD3VOFramePose::setToOriginImpl)
-        .def("oplus_impl", &VertexD3VOFramePose::oplusImpl)    // double* -> void
+        .def("oplus_impl", &VertexD3VOFramePose::oplusImpl)  
     ;
 
 }
