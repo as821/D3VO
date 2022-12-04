@@ -29,7 +29,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 	# Run D3VO offline with prerecorded video
 	i = 0
-	while cap.isOpened() and i < 5:
+	while cap.isOpened():
 		ret, frame = cap.read()
 		if ret == True:
 			frame = cv2.resize(frame, (W, H))
