@@ -33,9 +33,9 @@ class Map:
 		# of the intrinsic and taking just the first 3 rows and first 3
 		# columns.
 		# The homography is then given by R1 @ inv(R2) @ inv(K)
-		R1 = (np.linalg.inv(instrinsics) @ last_key_frame.pose)[:3, :3]
-		R2 = (np.linalg.inv(instrinsics) @ frame.pose)[:3, :3]
-		homography_t = instrinsics @ R1 @ np.linalg.inv(R2) @ np.linalg.inv(instrinsics)
+		R1 = last_key_frame.pose[:3, :3]
+		R2 = frame.pose[:3, :3]
+		homography_t =  R1 @ np.linalg.inv(R2)
 
 		f = 0
 		ft = 0
