@@ -5,10 +5,11 @@ import numpy as np
 from copy import deepcopy
 
 class D3VO:
-	def __init__(self, intrinsic):
+	def __init__(self, intrinsic, trajectory_scale=27):
 		self.intrinsic = intrinsic
 		self.mp = Map()
 		self.nn = Networks()
+		self.trajectory_scale = trajectory_scale
 
 	def process_frame(self, frame, optimize=True):
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
@@ -81,21 +82,27 @@ class D3VO:
 
 
 	def relative_to_global(self):
-		gbl = []
-		for idx, f in enumerate(self.mp.frames):
+		"""Convert relative pose stored in frames into a global pose."""
+		pred_pose = []
+		for idx, f in enumerate(self.mp.frames[1:]):		
 			if idx > 1:
-				gbl.append(np.dot(gbl[-1], np.linalg.inv(f.pose)))
+				pred_pose.append(np.dot(pred_pose[idx-1], np.linalg.inv(self.mp.frames[idx].pose)))
 			else:
-				gbl.append(np.linalg.inv(f.pose))
-		return gbl
+				pred_pose.append(np.linalg.inv(f.pose))
+
+		for t in range(len(pred_pose)):
+			pred_pose[t][:3, 3] *= self.trajectory_scale
+		return pred_pose
 
 
-	def convert_dict_for_eval(self, inp_dict):
-		# This is hacky, but our trajectory follows the same shape as the ground truth but has incorrect scale
-		# This is likely an issue with the scale of DepthNet + PoseNet
-		translation_scale = 27
-		eval_dict = deepcopy(inp_dict)
-		for t in eval_dict:
-			if t > 1:
-				eval_dict[t][:3, 3] *= translation_scale
-		return eval_dict
+	def run_eval(self, gt_pose, eval, plot_traj=False):
+		"""Evaluate the performance of D3VO compared to the ground truth poses provided and print result."""
+		# recompute global poses from stored relative poses every time to allow bundle adjustment changes to propagate
+		pred_pose = {idx+1 : p for idx, p in enumerate(self.relative_to_global())}
+		ate = eval.compute_ATE(gt_pose, pred_pose)
+		rpe_trans, rpe_rot = eval.compute_RPE(gt_pose, pred_pose)
+		print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
+
+		if plot_traj:
+			eval.plot_trajectory(gt_pose, pred_pose, 9)
+

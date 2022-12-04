@@ -29,7 +29,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 	# Run D3VO offline with prerecorded video
 	i = 0
-	while cap.isOpened():
+	while cap.isOpened() and i < 5:
 		ret, frame = cap.read()
 		if ret == True:
 			frame = cv2.resize(frame, (W, H))
@@ -52,18 +52,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				if i > 1:
-					pred_pose_kitti[i] = np.dot(pred_pose_kitti[i-1], np.linalg.inv(d3vo.mp.frames[i].pose))
-				else:
-					pred_pose_kitti[i] = np.linalg.inv(d3vo.mp.frames[i].pose)
-
-				eval_dict = d3vo.convert_dict_for_eval(pred_pose_kitti)
-				ate = eval.compute_ATE(gt_poses, eval_dict)
-				rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
-				print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
-
-				if DEBUG and len(d3vo.mp.frames) % 10 == 0:
-					eval.plot_trajectory(gt_poses, eval_dict, 9)
+				d3vo.run_eval(gt_poses, eval, plot_traj=(DEBUG and len(d3vo.mp.frames) % 10 == 0))
 		else:
 			break
 		i += 1
@@ -74,17 +63,13 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 				break
 	
 	# Final trajectory evaluation
-	eval_dict = d3vo.convert_dict_for_eval(pred_pose_kitti)
 	if gt_path != "":
-		ate = eval.compute_ATE(gt_poses, eval_dict)
-		rpe_trans, rpe_rot = eval.compute_RPE(gt_poses, eval_dict)
-		print("ATE (m): ", ate, ". RPE (m): ", rpe_trans, ". RPE (deg): ", rpe_rot * 180 /np.pi)
-		eval.plot_trajectory(gt_poses, eval_dict, 9)
+		d3vo.run_eval(gt_poses, eval, plot_traj=True)
 
 
 	# Store pose predictions to a file (do not save identity pose of first frame)
 	save_path = os.path.join(save_path)
-	np.save(save_path, [eval_dict[i] for i in eval_dict])
+	np.save(save_path, d3vo.relative_to_global())
 	print("-> Predictions saved to", save_path)
 
 
