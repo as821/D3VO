@@ -1,3 +1,5 @@
+# Simple script to convert poses in a .npy file into the .txt format expected by eval_odom.py
+
 import sys
 import numpy as np
 
@@ -20,11 +22,9 @@ if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("error: expecting 2 commandline arguments: source .npy and destination .txt files")
     
-
     pred_poses_np = np.load(sys.argv[1])
     kitti = [numpy_to_kitti(p) for p in pred_poses_np]
 
-    # TODO write to output file
     with open(sys.argv[2], "w") as fd:
         for line in kitti:
             fd.write(f"{line}\n")

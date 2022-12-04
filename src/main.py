@@ -5,13 +5,12 @@ import numpy as np
 import argparse
 
 from d3vo import D3VO
-from helper import calc_avg_matches 
 
 sys.path.insert(1, os.path.join(sys.path[0], '../kitti-odom-eval-master'))
 from kitti_odometry import KittiEvalOdom
 
 
-DEBUG = True
+DEBUG = False
 PER_FRAME_ERROR = True
 
 
@@ -25,7 +24,6 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 		# Use open source KITTI evaluation code, requires poses in form of a dictionary
 		eval = KittiEvalOdom(out_dir)
 		gt_poses = eval.load_poses_from_txt(gt_path)
-		pred_pose_kitti = {}
 
 	# Run D3VO offline with prerecorded video
 	i = 0
@@ -36,23 +34,9 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 			print("\n*** frame %d/%d ***" % (i, CNT))
 			d3vo.process_frame(frame)
 
-			if DEBUG:
-				# show keypoints with matches in this frame
-				for pidx, p in enumerate(d3vo.mp.frames[-1].kps):
-					if pidx in d3vo.mp.frames[-1].pts:
-						# green for matched keypoints 
-						cv2.circle(frame, [int(i) for i in p], color=(0, 255, 0), radius=3)
-					else:
-						# black for unmatched keypoint in this frame
-						cv2.circle(frame, [int(i) for i in p], color=(0, 0, 0), radius=3)
-
-				# Calculate the average number of frames each point in the last frame is also visible in
-				n_match, frame = calc_avg_matches(d3vo.mp.frames[-1], frame, show_correspondence=False)
-				print("Matches: %d / %d (%f)" % (len(d3vo.mp.frames[-1].pts), len(d3vo.mp.frames[-1].kps), n_match))
-
 			# Run evaluation
 			if gt_path != "" and PER_FRAME_ERROR and len(d3vo.mp.frames) > 1:
-				d3vo.run_eval(gt_poses, eval, plot_traj=(DEBUG and len(d3vo.mp.frames) % 10 == 0))
+				d3vo.run_eval(gt_poses, eval, plot_traj=(len(d3vo.mp.frames) % 10 == 0))
 		else:
 			break
 		i += 1

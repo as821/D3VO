@@ -5,15 +5,18 @@ import g2o
 from frontend import match_frame_kps
 
 
-
 class Map:
-	"""Class to store and optimize over all current frames, points, etc."""
-	def __init__(self, alpha=0.5, num_kf=7, trajectory_scale = 27):
+	"""Maintains and optimizes over all frames, points, and keyframes."""
+	def __init__(self, alpha=0.5, num_kf=7, trajectory_scale=30):
 		self.frames = []
 		self.points = []
 		self.keyframes = []
 		self.frame_idx = self.pt_idx = 0
+
+		# Maximum number of keyframes, manages size of optimization window
 		self.num_kf = num_kf
+
+		# Hyperparameter for translation scaling
 		self.trajectory_scale = trajectory_scale
 		
 		# Optimization hyperparameter for weighting uncertainty of a pixel (D3VO Eq. 13)
@@ -28,6 +31,7 @@ class Map:
 		self.frames.append(frame)
 		return ret
 
+
 	def add_point(self, pt):
 		"""Add a Point to the Map"""
 		assert (type(pt) == Point)
@@ -36,45 +40,27 @@ class Map:
 		self.points.append(pt)
 		return ret
 
+
 	def check_add_key_frame(self, frame):
-		"""Check if the given Frame is a keyframe, if so add to list and evaluate marginalization."""
+		"""Check if the given Frame should be a keyframe, if so add it to the keyframe list and evaluate marginalization."""
 		if frame.id == 0:
+			# Always make the first frame a keyframe
 			key_frame = True
 		else:
 			key_frame = self.check_key_frame(frame)
 
 		if key_frame:
 			self.keyframes.append(frame)
-			self.marginalize()
+			
+		# Simple marginalization policy to maintain optimization window size
+		if len(self.keyframes) >= self.num_kf:
+			self.keyframes[0].marginalize = True
 
 		return key_frame
 
-	def marginalize(self):
-		"""Check if any of the keyframes are ready for marginalization"""
-		# latest_key_frame = self.keyframes[-1]
-		# max_dist = 0
-		# max_dist_idx = 0
-		# marginalized_count = 0
-
-		# # Can marginalize everything apart from the last two keyframes:
-		# for i in range(len(self.keyframes) - 1):
-		# 	l1, l2 = match_frame_kps(latest_key_frame, self.keyframes[i])
-		# 	if len(l2) / len(self.keyframes[i].kps) < 0.1:
-		# 		self.keyframes[i].marginalize = True
-		# 		marginalized_count += 1
-		# 	frame_dist = np.linalg.norm(latest_key_frame.image - self.keyframes[i].image)
-		# 	if frame_dist > max_dist:
-		# 		max_dist = frame_dist
-		# 		max_dist_idx = i
-
-		# if len(self.keyframes) > self.num_kf and marginalized_count == 0:
-		# 	self.keyframes[max_dist_idx].marginalize = True
-
-		if len(self.keyframes) > self.num_kf:
-			self.keyframes[0].marginalize = True
-
 
 	def check_key_frame(self, frame):
+		"""Return True if the given Frame should be made a keyframe."""
 		last_key_frame = self.keyframes[-1]
 		w_a = 0.0
 		w_f = 0.6
@@ -83,12 +69,6 @@ class Map:
 		l1, l2 = match_frame_kps(last_key_frame, frame)
 
 		# Compute homography to wrap points just for translation
-		# Camera projection is given by x = K[R | Rt]X where
-		# K[R | Rt] is the pose for the camera.
-		# We find the rotation for camera by multiplying with inverse
-		# of the intrinsic and taking just the first 3 rows and first 3
-		# columns.
-		# The homography is then given by R1 @ inv(R2) @ inv(K)
 		global_poses = self.relative_to_global()
 		if last_key_frame.id == 0:
 			# Relative to global does not include the identity pose for the first frame, indices are off by 1 compared to IDs
@@ -121,14 +101,15 @@ class Map:
 
 
 	def optimize(self, intrinsic, iter=6, verbose=False):
-		"""Run hypergraph-based optimization over current Points and Frames. Work in progress..."""
+		"""Run hypergraph-based optimization over current Points and Frames. Uses custom 
+		VertexD3VOFramePose, VertexD3VOPointDepth, and EdgeProjectD3VO g2o types implemented in 
+		C++ and used here through pybind to implement the backend loss described by D3VO paper."""
 		# create optimizer
 		opt = g2o.SparseOptimizer()
 		solver = g2o.BlockSolverSE3(g2o.LinearSolverCSparseSE3())
 		solver = g2o.OptimizationAlgorithmLevenberg(solver)
 		opt.set_algorithm(solver)
 		opt.set_verbose(verbose)
-
 		opt_frames, opt_pts = {}, {}
 	
 		# add camera
@@ -140,18 +121,16 @@ class Map:
 		cam.set_id(0)
 		opt.add_parameter(cam)  
 
-		if len(self.keyframes) >= 7:
-			self.keyframes[0].marginalize = True
-
 		# set up frames as vertices
 		for idx, f in enumerate(self.keyframes):
 			# add frame to the optimization graph as an SE(3) pose
 			v_se3 = g2o.VertexD3VOFramePose(f.image)
-			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3])) 	# .Isometry3d() use frame pose estimate as initialization
-			v_se3.set_id(f.id * 2)			# even IDs only
+			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]))
+			v_se3.set_id(f.id * 2)			# even IDs only (avoid ID conflict with points)
 
 			if idx == 0:
-				v_se3.set_fixed(True)       # Hold first frame constant
+				# Hold first frame in the window constant
+				v_se3.set_fixed(True)       
 
 			if f.marginalize:
 				# optimization library crashes if we marginalize a frame that is not at the beginning of the window (oldest keyframe)
@@ -161,17 +140,15 @@ class Map:
 			opt.add_vertex(v_se3)
 			opt_frames[f] = v_se3
 
-		# set up point edges between frames and depths
+		# create a dictionary of keypoints that connect keyframes and add edges to the optimizer between this 
+		# point, its host keyframe, and another keyframe
 		kpts = self.keypoints()
 		for p in kpts:
+			# initialize point estimate with the depth estimate of its host frame
 			host_frame, host_uv_coord = kpts[p][0][0], kpts[p][0][0].optimizer_kps[kpts[p][0][1]]
 			pt = g2o.VertexD3VOPointDepth(host_uv_coord[0], host_uv_coord[1])
 			pt.set_id(p.id * 2 + 1)		# odd IDs, no collisions with frame ID
-
-			# unproject point with depth estimate onto 3D world using the host frame depth estimate
-			host_depth_est = host_frame.depth[host_uv_coord[0]][host_uv_coord[1]]
-			pt.set_estimate(host_depth_est)			
-			
+			pt.set_estimate(host_frame.depth[host_uv_coord[0]][host_uv_coord[1]])			
 			pt.set_fixed(False)
 			opt_pts[p] = pt
 			opt.add_vertex(pt)
@@ -186,24 +163,21 @@ class Map:
 				
 				# Incorporate uncertainty into optimization (D3VO Eq.13)
 				weight_mx = np.eye(3) * (self.alpha**2) / (self.alpha**2 + np.sqrt(host_frame.uncertainty[host_uv_coord[0]][host_uv_coord[1]])**2)
-
-				edge.set_information(weight_mx)								# simplified setting, no weights so use identity
+				edge.set_information(weight_mx)					
 				edge.set_robust_kernel(g2o.RobustKernelHuber())
 				edge.set_parameter_id(0, 0)
 				opt.add_edge(edge)
 
-		# run optimizer
+		# run optimizer if there are keypoints
 		if len(kpts) > 0:
 			opt.initialize_optimization()
 			opt.optimize(iter)
 
-			# store optimization results 
+			# store optimization results in our objects
 			for p in kpts:
-				# optimization gives unprojected point in 3D
 				est = opt_pts[p].estimate()
 				assert est >= 0
 				p.update_host_depth(est)
-				# print(est)
 		
 			for idx, f in enumerate(self.keyframes):
 				est = opt_frames[f].estimate()
@@ -219,7 +193,7 @@ class Map:
 					pt.valid = False
 
 	def keypoints(self):
-		"""Return a list of the points that originate in a keyframe and connect to other keyframes"""
+		"""Return a dictionary of the Points that originate in a keyframe and connect to other keyframes."""
 		# Pretend that all valid points in the oldest keyframe originate in that keyframe
 		candidate = [p for p in list(self.keyframes[0].pts.values()) if p.valid]
 
@@ -240,14 +214,13 @@ class Map:
 					# Store frame as well as its index in the Point's frame list
 					local.append((f, idx))
 
-			# Only use a point if it connects to more than one keypoint
+			# Only use a point if it connects to more than one keyframe
 			if len(local) > 1:
 				keypoints[p] = local
-
 		return keypoints
 
 	def relative_to_global(self):
-		"""Convert relative pose stored in frames into a global pose."""
+		"""Convert the relative pose stored in frames into a global pose."""
 		pred_pose = []
 		for idx, f in enumerate(self.frames[1:]):		
 			if idx > 1:

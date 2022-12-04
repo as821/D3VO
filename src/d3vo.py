@@ -13,9 +13,8 @@ class D3VO:
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
 		and backend optimization (if optimize == True)."""
 		# TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)
-		np.random.seed(100)           # use same seed for debugging
 		uncertainty = np.zeros_like(frame)		# uncertainty == 0, get weight of 1. as uncertainty increases (positive or negative), weight drops
-		brightness_params = (0, 0)      # a, b
+		brightness_params = (0, 0)      		# a, b
 
 		# Run DepthNet to get depth map
 		depth = self.nn.depth(frame)
@@ -37,17 +36,16 @@ class D3VO:
 
 
 	def frontend(self, frame, depth, uncertainty, pose, brightness_params):
-		"""Run frontend tracking on the given frame --> just process every frame with a basic feature extractor for right now.
-		Return true to continue onto backend optimization"""
+		"""Run frontend tracking on the given frame. Extract keypoints, match them keypoints in the preceding 
+        frame, add Frame to the map, and possibly make the Frame a keyframe. Return true to run backend 
+        optimization after this function returns."""
 		# create frame and add it to the map
 		f = Frame(self.mp, frame, depth, uncertainty, pose, brightness_params)
 
-		# cannot match first frame to any previous frames (but make it a keyframe)
+		# cannot match initial frame to any previous frames (but make it a keyframe)
 		if f.id == 0:
 			self.mp.check_add_key_frame(f)
 			return False
-
-		# TODO this should be done with DSO's feature extractor/matching approach, this is just to enable backend work
 
 		# Process f and the preceeding frame with a feature matcher. Iterate over match indices
 		prev_f = self.mp.frames[-2]
