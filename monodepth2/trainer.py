@@ -405,8 +405,12 @@ class Trainer:
 
             # Reference: https://github.com/no-Seaweed/Learning-Deep-Learning-1/blob/master/paper_notes/sfm_learner.md
             # transformed_sigma = (10 * sigma + 0.1)
-            transformed_sigma = sigma + 0.001
-            reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
+            
+            # Exp 1 
+            # transformed_sigma = sigma + 0.001
+            # reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
+
+            reprojection_loss = (reprojection_loss * sigma)
 
         return reprojection_loss
 
@@ -505,7 +509,10 @@ class Trainer:
             
             reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)
 
-            #loss += torch.mean((sigma - 1) ** 2)
+            loss += torch.mean((sigma - 1) ** 2)
+            # categorical_loss = nn.CrossEntropyLoss()
+            # loss += categorical_loss(sigma, torch.ones_like(sigma))
+            # print(sigma.min(), sigma.max(), sigma.mean())
             loss += self.opt.disparity_smoothness * reg_loss / (2 ** scale)
 
             total_loss += loss
