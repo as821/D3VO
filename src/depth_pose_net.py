@@ -96,7 +96,7 @@ class Networks():
             plt.plot(mn_coord[0], mn_coord[1], marker="o", markersize=10, markeredgecolor="red", markerfacecolor="red")
 
         # Return as numpy array (self.width, self.heights)
-        return depth_resized
+        return depth_resized, np.zeros_like(depth_resized)
 
 
     def pose(self, img1, img2, depth):
@@ -111,4 +111,4 @@ class Networks():
             axisangle, translation, a, b = self.posenet(torch.cat((img1, img2), 1))
 
         # TODO(as) depending on training settings, may have to pass invert=True here...
-        return transformation_from_parameters(axisangle[:, 0], translation[:, 0] * (1 / depth).mean()).cpu().numpy().squeeze(), a, b
+        return transformation_from_parameters(axisangle[:, 0], translation[:, 0] * (1 / depth).mean()).cpu().numpy().squeeze(), a.numpy(), b.numpy()

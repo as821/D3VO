@@ -124,7 +124,8 @@ class Map:
 		# set up frames as vertices
 		for idx, f in enumerate(self.keyframes):
 			# add frame to the optimization graph as an SE(3) pose
-			v_se3 = g2o.VertexD3VOFramePose(f.image)
+			transform = (f.a * f.image + f.b).squeeze()
+			v_se3 = g2o.VertexD3VOFramePose(transform)
 			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]))
 			v_se3.set_id(f.id * 2)			# even IDs only (avoid ID conflict with points)
 
