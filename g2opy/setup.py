@@ -43,5 +43,6 @@ setup(
         error functions. g2o has been designed to be easily extensible to a wide 
         range of problems and a new problem typically can be specified in a few 
         lines of code. The current implementation provides solutions to several 
-        variants of SLAM and BA."""
+        variants of SLAM and BA.""",
+    py_modules=[]
 )
