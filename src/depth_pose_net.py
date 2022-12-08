@@ -70,8 +70,8 @@ class Networks():
         disp_resized_np = disp_resized.squeeze().cpu().numpy()
 
         _, pred_depth = disp_to_depth(outputs[("disp", 0)], MIN_DEPTH, MAX_DEPTH)
-        depth_resized = torch.nn.functional.interpolate(pred_depth,(original_height, original_width), mode="bilinear", align_corners=False)
-        depth_resized = depth_resized.numpy().squeeze()
+        depth_resized = torch.nn.functional.interpolate(pred_depth,(original_height, original_width), mode="bilinear", align_corners=False).numpy().squeeze()
+        sigma_resized = torch.nn.functional.interpolate(outputs[("disp-sigma", 0)], (original_height, original_width), mode="bilinear", align_corners=False).numpy().squeeze()
 
         if visualize:
             vmax = np.percentile(disp_resized_np, 95)
@@ -96,7 +96,7 @@ class Networks():
             plt.plot(mn_coord[0], mn_coord[1], marker="o", markersize=10, markeredgecolor="red", markerfacecolor="red")
 
         # Return as numpy array (self.width, self.heights)
-        return depth_resized, np.zeros_like(depth_resized)
+        return depth_resized, sigma_resized
 
 
     def pose(self, img1, img2, depth):
