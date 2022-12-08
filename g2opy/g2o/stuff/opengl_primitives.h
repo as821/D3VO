@@ -19,6 +19,8 @@
 #ifndef G2O_OPENGL_PRIMITIVES_H
 #define G2O_OPENGL_PRIMITIVES_H
 
+#define GL_SILENCE_DEPRECATION
+
 /** @addtogroup viewer libviewer **/
 // @{
 

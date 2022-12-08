@@ -51,10 +51,11 @@ class Point:
 		self.frames = []        # set of keyframes where this point is visible
 		self.idxs = []          # index for the kps/des lists of the corresponding frame. Parallel list to self.frames
 		self.id = map.add_point(self)
+		self.valid = True       # point becomes invalid when a Frame it appears in is marginalized
 	
 	def get_host_frame(self):
 		# Host frame for this point is the first frame it is observed in
-		return self.frames[0], self.frames[0].kps[self.idxs[0]]
+		return self.frames[0], self.frames[0].optimizer_kps[self.idxs[0]]
 
 	def update_host_depth(self, depth):
 		host_frame, host_uv_coord = self.get_host_frame()
@@ -64,7 +65,7 @@ class Point:
 		"""Add a Frame where this Point was observed"""
 		assert idx not in frame.pts
 		assert frame not in self.frames
-		assert idx < len(frame.kps)
+		assert idx < len(frame.optimizer_kps)
 
 		frame.pts[idx] = self
 		self.frames.append(frame)
@@ -81,9 +82,14 @@ class Frame:
 		self.brightness_params = brightness_params
 		self.pose = pose
 
+		self.marginalize = False
+
 		# Run frontend keypoint extractor
 		self.kps, self.des = extract_features(image)
 		self.pts = {}                       # map kps/des list index to corresponding Point object   
 
+		# Optimizer expects keypoints in a different coordinate ordering
+		self.optimizer_kps = [(k[1], k[0]) for k in self.kps]
 
-
+		# Ensure that u/v coordinates of keypoints match the image/depth/uncertainty dimension shape (catch these issues at the source!)
+		assert all([p[0] >= 0 and p[0] <= self.image.shape[0] and p[1] >= 0 and p[1] <= self.image.shape[1] for p in self.optimizer_kps])

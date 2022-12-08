@@ -26,7 +26,7 @@
 
 #ifndef G2O_OPENGL_WRAPPER_H
 #define G2O_OPENGL_WRAPPER_H
-
+#define GL_SILENCE_DEPRECATION
 #include "g2o/config.h"
 
 #ifdef WINDOWS

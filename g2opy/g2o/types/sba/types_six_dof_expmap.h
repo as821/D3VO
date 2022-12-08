@@ -34,6 +34,17 @@
 #include "types_sba.h"
 #include <Eigen/Geometry>
 
+#include "g2o/config.h"
+#include "g2o/core/hyper_graph_action.h"
+#include "g2o/types/slam3d/isometry3d_mappings.h"
+#include "g2o/types/slam3d/g2o_types_slam3d_api.h"
+
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
+#include <pybind11/numpy.h>
+
+
+
 namespace g2o {
 namespace types_six_dof_expmap {
 void init();
@@ -55,6 +66,8 @@ class G2O_TYPES_SBA_API CameraParameters : public g2o::Parameter
       baseline(baseline){}
 
     Vector2D cam_map (const Vector3D & trans_xyz) const;
+
+    Vector3D cam_unmap(const Vector2D & trans_uv, const double depth) const;
 
     Vector3D stereocam_uvu_map (const Vector3D & trans_xyz) const;
 
@@ -170,6 +183,7 @@ public:
   virtual void linearizeOplus ();
   CameraParameters * _cam;
 };
+
 
 
 
@@ -321,6 +335,114 @@ class EdgeStereoSE3ProjectXYZOnlyPose : public BaseUnaryEdge<3, Vector3D, Vertex
   double fx, fy, cx, cy, bf;
 };
 
+
+
+
+
+
+
+/*
+An Edge to implement the D3VO photometric error. Connects to a VertexD3VOPointDepth and two VertexD3VOFramePose.
+*/
+class G2O_TYPES_SBA_API EdgeProjectD3VO : public  g2o::BaseMultiEdge<3, Vector3D>
+{
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        EdgeProjectD3VO()  {
+            resizeParameters(1);
+            installParameter(_cam, 0);
+            out_of_bounds = false;
+        }
+
+        virtual bool read(std::istream& is) {return false;}
+        virtual bool write(std::ostream& os) const {return false;}
+        void computeError();
+        virtual void linearizeOplus();
+        CameraParameters * _cam;
+        bool out_of_bounds;
+};
+
+
+/*
+A Vertex type to represent a single point depth estimate. The depth estimate for this vertex comes from its host frame.
+*/
+class G2O_TYPES_SBA_API VertexD3VOPointDepth : public BaseVertex<1, double>{
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+
+        // Pixel coordinate in this Point's host frame
+        Vector2D uv;
+
+        VertexD3VOPointDepth(const int u, const int v) {
+            uv = Vector2D(u, v);
+        }
+
+        virtual void setToOriginImpl() {
+            _estimate = 0.;
+        }
+
+        virtual void oplusImpl(const double* update_)  {
+            // std::cout << "VertexD3VOPointDepth oplusImpl update: (" << *update_ << ")" << std::endl;
+            _estimate += (*update_);
+        }
+
+        virtual bool setEstimateDataImpl(const double* est){
+            // std::cout << "setting (" << uv(0) << ", "<< uv(1) << ") estimate to: " << *est << std::endl;
+            _estimate = *est;
+            return true;
+        }
+
+        virtual bool getEstimateData(double* est) const{
+            *est = _estimate;
+            return true;
+        }
+
+        virtual bool read (std::istream& is){return false;}
+
+        virtual bool write (std::ostream& os) const {return false;}
+};
+
+
+
+/*
+A SE3 Vertex parameterized internally with a transformation matrix and externally with its exponential map used to 
+represent the pose of a single Frame. This vertex also stores the image of the frame it represents in order to 
+implement a photometric error.
+ 
+Inspired by VertexSE3Expmap. SE3Quat slightly worse performance than using Isometry3D (inspired by VertexSE3), 
+but optimization is much more stable and matches the exponential map we expect to see in the pose update.
+*/
+class G2O_TYPES_SLAM3D_API VertexD3VOFramePose : public BaseVertex<6, SE3Quat>
+{
+    public:
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+
+        pybind11::buffer_info pixel_inten;
+       
+        VertexD3VOFramePose(pybind11::array_t<double> pixel_intensity) : BaseVertex<6, SE3Quat>()
+        {
+            setToOriginImpl();
+            updateCache();
+
+            // Process + store input numpy array
+            pixel_inten = pixel_intensity.request();
+        }
+
+        virtual void setToOriginImpl() {
+            _estimate = SE3Quat();
+        }
+
+        virtual void oplusImpl(const double* update_)  {
+            Eigen::Map<const Vector6d> update(update_);
+            setEstimate(SE3Quat::exp(update)*estimate());
+        }
+
+    virtual bool read (std::istream& is){return false;}
+
+    virtual bool write (std::ostream& os) const {return false;}
+
+};
 } // end namespace
 
 #endif

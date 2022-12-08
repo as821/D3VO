@@ -68,12 +68,23 @@ inline Vector3D invert_depth(const Vector3D & x){
 }
 
 Vector2D  CameraParameters::cam_map(const Vector3D & trans_xyz) const {
-  Vector2D proj = project2d(trans_xyz);
-  Vector2D res;
-  res[0] = proj[0]*focal_length + principle_point[0];
-  res[1] = proj[1]*focal_length + principle_point[1];
-  return res;
+    // Project 3D point onto 2D pixel coordinate
+    Vector2D proj = project2d(trans_xyz);
+    Vector2D res;
+    res[0] = proj[0]*focal_length + principle_point[0];
+    res[1] = proj[1]*focal_length + principle_point[1];
+    return res;
 }
+
+Vector3D  CameraParameters::cam_unmap(const Vector2D & trans_uv, const double depth) const {
+    // Unproject 2D pixel coordinate onto 3D point
+    Vector3D res;
+    res(0) = (trans_uv(0) - principle_point[0]) / focal_length * depth;
+    res(1) = (trans_uv(1) - principle_point[1]) / focal_length * depth;
+    res(2) = depth;
+    return res;
+}
+
 
 Vector3D CameraParameters::stereocam_uvu_map(const Vector3D & trans_xyz) const {
   Vector2D uv_left = cam_map(trans_xyz);
@@ -106,6 +117,10 @@ bool VertexSE3Expmap::write(std::ostream& os) const {
 EdgeSE3Expmap::EdgeSE3Expmap() :
   BaseBinaryEdge<6, SE3Quat, VertexSE3Expmap, VertexSE3Expmap>() {
 }
+
+
+
+
 
 bool EdgeSE3Expmap::read(std::istream& is)  {
   Vector7d meas;
@@ -637,5 +652,149 @@ void EdgeStereoSE3ProjectXYZOnlyPose::linearizeOplus() {
   _jacobianOplusXi(2, 4) = 0;
   _jacobianOplusXi(2, 5) = _jacobianOplusXi(0, 5) - bf * invz_2;
 }
+
+
+
+
+
+
+
+
+
+void EdgeProjectD3VO::computeError(){
+    /* Compute the D3VO loss. */
+    const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
+    const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
+    const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
+    const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
+
+    Vector2D p_prime = cam->cam_map(dest_frame->estimate() * host_frame->estimate().inverse() * cam->cam_unmap(pt->uv, pt->estimate()));
+
+    // Obtain pixel intensity for host and destination frames for points p and p'
+    double* host_img = (double*) host_frame->pixel_inten.ptr;
+    double* dest_img = (double*) dest_frame->pixel_inten.ptr;
+
+    // Have to index into array manually...
+    int X = host_frame->pixel_inten.shape[0];
+    int Y = host_frame->pixel_inten.shape[1];
+    int Z = host_frame->pixel_inten.shape[2];
+    int host_base_idx = (int)pt->uv(0) * Y * Z + Z * (int)pt->uv(1);
+    int dest_base_idx = (int)p_prime(0) * Y * Z + Z * (int)p_prime(1);
+
+    // Check that the reprojection is not outside of the frame. Also sanity checks the original point is valid.
+    if(host_base_idx + 2 >= X*Y*Z || dest_base_idx + 2 >= X*Y*Z || host_base_idx < 0 || dest_base_idx < 0) {
+        _error.setZero();
+        out_of_bounds = true;
+        return;
+    }
+    else{
+        out_of_bounds = false;
+    }
+
+    // Compute photometric error
+    Vector3D host_inten(host_img[host_base_idx], host_img[host_base_idx+1], host_img[host_base_idx+2]);
+    Vector3D dest_inten(dest_img[dest_base_idx], dest_img[dest_base_idx+1], dest_img[dest_base_idx+2]);
+    _error = dest_inten - host_inten;
+}
+
+
+
+void EdgeProjectD3VO::linearizeOplus(){
+    /* Implements the Jacobian of the D3VO loss. */
+    // General resource for DSO Jacobian derivation
+    // https://openaccess.thecvf.com/content_ECCV_2018/papers/David_Schubert_Direct_Sparse_Odometry_ECCV_2018_paper.pdf (pg8) has better Jacobian breakdown
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf detailed walk through, but in Korean
+    
+    if(out_of_bounds) {
+        // Out of bounds reprojection detected, cause optimizer to ignore this edge
+        Eigen::Matrix<double,1,6> frame_error;
+        Eigen::Matrix<double,1,1> depth_error;
+        depth_error.setZero();
+        frame_error.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error;
+        _jacobianOplus[2] = frame_error;
+        out_of_bounds = false;
+        return;
+    }
+    
+    const VertexD3VOPointDepth* pt = static_cast<const VertexD3VOPointDepth*>(_vertices[0]);
+    const VertexD3VOFramePose* dest_frame = static_cast<const VertexD3VOFramePose*>(_vertices[1]);
+    const VertexD3VOFramePose* host_frame = static_cast<const VertexD3VOFramePose*>(_vertices[2]);
+    const CameraParameters* cam = static_cast<const CameraParameters*>(parameter(0));
+
+
+    // Finite difference approximation to the image gradient (J_I = (\partial I_j) / (\partial p'))
+    int X = dest_frame->pixel_inten.shape[0];
+    int Y = dest_frame->pixel_inten.shape[1];
+    int Z = host_frame->pixel_inten.shape[2];
+    Isometry3D T_host_dest = dest_frame->estimate() * host_frame->estimate().inverse();
+    Vector3D unprojected_X = T_host_dest * cam->cam_unmap(pt->uv, pt->estimate());
+    Vector2D p_prime = cam->cam_map(unprojected_X);
+    int p_prime_u = (int) p_prime(0);
+    int p_prime_v = (int) p_prime(1);
+    
+    // Validate point not near the edge of the image
+    Vector2D J_Ij;
+    if(p_prime_u + 1 < X && p_prime_u - 1 >= 0 && p_prime_v - 1 >= 0 && p_prime_v + 1 < Y) {
+        // Note: top left of image is (0, 0)
+        double* dest_img = (double*) dest_frame->pixel_inten.ptr;
+        int dest_base_idx = p_prime_u * Y * Z + Z * p_prime_v;
+        double dx_r = dest_img[dest_base_idx + Z] - dest_img[dest_base_idx - Z];        // right - left;
+        double dy_r = dest_img[dest_base_idx + Y*Z] - dest_img[dest_base_idx - Y*Z];    // bottom - top;
+        double dx_g = dest_img[dest_base_idx + Z + 1] - dest_img[dest_base_idx - Z + 1];  
+        double dy_g = dest_img[dest_base_idx + Y*Z + 1] - dest_img[dest_base_idx - Y*Z + 1];   
+        double dx_b = dest_img[dest_base_idx + Z + 2] - dest_img[dest_base_idx - Z + 2]; 
+        double dy_b = dest_img[dest_base_idx + Y*Z + 2] - dest_img[dest_base_idx - Y*Z + 2];  
+
+        // Gradient of RGB image is not well-defined, just take the average over gradients from all channels
+        J_Ij = Vector2D((dx_r + dx_g + dx_b) / 3, (dy_r + dy_g + dy_b) / 3);
+    }
+    else {
+        // Out of bounds reprojection detected / failure to calculate image gradient, cause optimizer to ignore this edge
+        Eigen::Matrix<double,1,6> frame_error;
+        Eigen::Matrix<double,1,1> depth_error;
+        depth_error.setZero();
+        frame_error.setZero(); 
+        _jacobianOplus[0] = depth_error;
+        _jacobianOplus[1] = frame_error;
+        _jacobianOplus[2] = frame_error;
+        return;
+    }
+
+    // d p' / dX   (where X is the unprojected and rotated point in 3D space)
+    double depth = pt->estimate();
+    Eigen::Matrix<double,2,3> dprime_dX = d_proj_d_y(cam->focal_length, unprojected_X);
+
+    // d X / d depth
+    Vector3D unprojected = cam->cam_unmap(pt->uv, depth) / depth;
+    Vector3D dx_dd = unprojected_X / depth;       
+
+    // d p' / d depth
+    Vector2D dprime_ddepth = dprime_dX * dx_dd;
+
+    // Full depth Jacobian (d I_J / d depth) = (d I_j / d p') * (d p' / d depth)  (dot product, not multiplication)
+    Eigen::Matrix<double,1,1> J_depth = J_Ij.transpose() * dprime_ddepth;
+
+    // Calculate relative pose Jacobian wrt T_j * T_i^{-1}
+    // https://github.com/edward0im/stereo-dso-g2o/blob/master/KR_dso_review_with_codes.pdf (slide 50)
+    // http://asrl.utias.utoronto.ca/~tdb/bib/barfoot_ser17.pdf Chapter 7
+    Eigen::Matrix<double,3,6> dX_drelative = d_expy_d_y(unprojected_X);
+
+    // d X / d (T_j * T_i^{-1})
+    Eigen::Matrix<double, 2, 6> J_relative_pose = dprime_dX * dX_drelative;
+    Eigen::Matrix<double,2,6> J_host_p_prime = J_relative_pose;
+    Eigen::Matrix<double,2,6> J_dest_p_prime = J_relative_pose;  
+
+    // Calculate full host and target frame Jacobians by incorporating image pixel gradients
+    Eigen::Matrix<double,1,6> J_host_T = J_Ij.transpose() * J_host_p_prime;
+    Eigen::Matrix<double,1,6> J_dest_T = J_Ij.transpose() * J_dest_p_prime;
+
+    // Order of these Jacobians is the same as the order of _vertices (depth, dest frame, host frame)
+    _jacobianOplus[0] = J_depth;
+    _jacobianOplus[1] = J_dest_T;
+    _jacobianOplus[2] = J_host_T;
+}
+
 
 } // end namespace
