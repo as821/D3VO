@@ -131,13 +131,23 @@ def test_simple(args):
             input_image = input_image.to(device)
             features = encoder(input_image)
             outputs = depth_decoder(features)
+            output_name = os.path.splitext(os.path.basename(image_path))[0]
 
             disp = outputs[("disp", 0)]
+
+            dis_sigma = outputs[("disp-sigma", 0)]
+            disp_sigma_resized = torch.nn.functional.interpolate(
+                disp, (original_height, original_width), mode="bilinear", align_corners=False)
+            disp_sigma_im = disp_sigma_resized.detach().cpu().numpy()
+            disp_sigma_im = pil.fromarray((disp_sigma_im[0][0] * 255.0).astype(np.uint8))
+            name_dest_im_sigma = os.path.join(output_directory, "{}_disp_sigma.jpeg".format(output_name))
+            disp_sigma_im.save(name_dest_im_sigma)
+
+
             disp_resized = torch.nn.functional.interpolate(
                 disp, (original_height, original_width), mode="bilinear", align_corners=False)
 
             # Saving numpy file
-            output_name = os.path.splitext(os.path.basename(image_path))[0]
             scaled_disp, depth = disp_to_depth(disp, 0.1, 100)
             if args.pred_metric_depth:
                 name_dest_npy = os.path.join(output_directory, "{}_depth.npy".format(output_name))

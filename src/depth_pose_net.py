@@ -24,20 +24,17 @@ MIN_DEPTH = 0.5
 
 
 class Networks():
-    def __init__(self, depth_encoder_path="encoder.pth", depth_decoder_path="depth.pth", 
-                    pose_encoder_path="pose_encoder.pth", pose_decoder_path="pose.pth"):
+    def __init__(self, weights_dir):
         """Initialize DepthNet and PoseNet from pretrained weights"""
-        # Initialize DepthNet from pretrained weights
-        model_name = "mono_640x192"
-        download_model_if_doesnt_exist(model_name)
-        depth_encoder_path = os.path.join("models", model_name, depth_encoder_path)
-        depth_decoder_path = os.path.join("models", model_name, depth_decoder_path)
+        depthencoder_path=os.path.join(weights_dir, "encoder.pth")
+        depth_decoder_path=os.path.join(weights_dir, "depth.pth")
+        pose_path=os.path.join(weights_dir, "pose.pth")
 
-        # LOADING PRETRAINED MODEL
+        # Initialize DepthNet from pretrained weights
         self.encoder = networks.ResnetEncoder(18, False)
         self.depth_decoder = networks.DepthDecoder(num_ch_enc=self.encoder.num_ch_enc, scales=range(4))
 
-        loaded_dict_enc = torch.load(depth_encoder_path, map_location='cpu')
+        loaded_dict_enc = torch.load(depthencoder_path, map_location='cpu')
         filtered_dict_enc = {k: v for k, v in loaded_dict_enc.items() if k in self.encoder.state_dict()}
         self.encoder.load_state_dict(filtered_dict_enc)
 
@@ -50,18 +47,10 @@ class Networks():
         self.h = loaded_dict_enc['height']
         self.w = loaded_dict_enc['width']
 
-
         # Initialize PoseNet
-        pose_encoder_path = os.path.join("models", model_name, pose_encoder_path)
-        pose_decoder_path = os.path.join("models", model_name, pose_decoder_path)
-
-        self.pose_encoder = networks.ResnetEncoder(18, False, 2)
-        self.pose_encoder.load_state_dict(torch.load(pose_encoder_path, map_location="cpu"))
-        self.pose_decoder = networks.PoseDecoder(self.pose_encoder.num_ch_enc, 1, 2)
-        self.pose_decoder.load_state_dict(torch.load(pose_decoder_path, map_location="cpu"))
-
-        self.pose_encoder.eval()
-        self.pose_decoder.eval()
+        self.posenet = networks.PoseCNN(num_input_frames=2)
+        self.posenet.load_state_dict(torch.load(pose_path, map_location="cpu"))
+        self.posenet.eval()
         
 
     def depth(self, img, visualize=False):
@@ -110,7 +99,7 @@ class Networks():
         return depth_resized
 
 
-    def pose(self, img1, img2):
+    def pose(self, img1, img2, depth):
         """Pass provided image pair through PoseNet. Returns pose estimate (4x4 homogenous matrix) from img1 to img2."""
         # Resize images to fit the pose network
         assert img1.shape == img2.shape
@@ -118,10 +107,8 @@ class Networks():
         img1 = transforms.ToTensor()(img1.resize((self.w, self.h), pil.LANCZOS)).unsqueeze(0)
         img2 = pil.fromarray(img2)
         img2 = transforms.ToTensor()(img2.resize((self.w, self.h), pil.LANCZOS)).unsqueeze(0)
-        all_color_aug = torch.cat((img1, img2), 1)
         with torch.no_grad():
-            feat = [self.pose_encoder(all_color_aug)]
-            axisangle, translation = self.pose_decoder(feat)
-        return transformation_from_parameters(axisangle[:, 0], translation[:, 0]).cpu().numpy().squeeze()
+            axisangle, translation, a, b = self.posenet(torch.cat((img1, img2), 1))
 
-
+        # TODO(as) depending on training settings, may have to pass invert=True here...
+        return transformation_from_parameters(axisangle[:, 0], translation[:, 0] * (1 / depth).mean()).cpu().numpy().squeeze(), a, b

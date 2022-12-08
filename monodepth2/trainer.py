@@ -14,6 +14,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tensorboardX import SummaryWriter
+from torchvision.utils import save_image
+
 
 import json
 
@@ -121,6 +123,7 @@ class Trainer:
         self.train_loader = DataLoader(
             train_dataset, self.opt.batch_size, True, num_workers=self.opt.num_workers, pin_memory=True, drop_last=True
         )
+
         val_dataset = self.dataset(
             self.opt.data_path, val_filenames, self.opt.height, self.opt.width, self.opt.frame_ids, 4, is_train=False, img_ext=img_ext
         )
@@ -210,11 +213,11 @@ class Trainer:
                     self.compute_depth_losses(inputs, outputs, losses)
 
                 self.log("train", inputs, outputs, losses)
-                self.val()
+                self.val(self.epoch * 10 + batch_idx)
 
             self.step += 1
 
-    def process_batch(self, inputs):
+    def process_batch(self, inputs, batch_idx = -1):
         """Pass a minibatch through the network and generate images and losses
         """
         for key, ipt in inputs.items():
@@ -244,7 +247,7 @@ class Trainer:
             outputs.update(self.predict_poses(inputs, features))
 
         self.generate_images_pred(inputs, outputs)
-        losses = self.compute_losses(inputs, outputs)
+        losses = self.compute_losses(inputs, outputs, batch_idx)
 
         return outputs, losses
 
@@ -318,18 +321,18 @@ class Trainer:
 
         return outputs
 
-    def val(self):
+    def val(self, batch_idx):
         """Validate the model on a single minibatch
         """
         self.set_eval()
         try:
-            inputs = self.val_iter.next()
+            inputs = next(self.val_iter)
         except StopIteration:
             self.val_iter = iter(self.val_loader)
-            inputs = self.val_iter.next()
+            inputs = next(self.val_iter)
 
         with torch.no_grad():
-            outputs, losses = self.process_batch(inputs)
+            outputs, losses = self.process_batch(inputs, batch_idx)
 
             if "depth_gt" in inputs:
                 self.compute_depth_losses(inputs, outputs, losses)
@@ -345,10 +348,13 @@ class Trainer:
         """
         for scale in self.opt.scales:
             disp = outputs[("disp", scale)]
+            sigma = outputs[("disp-sigma",scale)]
             if self.opt.v1_multiscale:
                 source_scale = scale
             else:
                 disp = F.interpolate(disp, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                disp_sigma = F.interpolate(sigma, [self.opt.height, self.opt.width], mode="bilinear", align_corners=False)
+                outputs[("disp-sigma",scale)] = disp_sigma
                 source_scale = 0
 
             _, depth = disp_to_depth(disp, self.opt.min_depth, self.opt.max_depth)
@@ -389,21 +395,26 @@ class Trainer:
         """Computes reprojection loss between a batch of predicted and target images
         """
         abs_diff = torch.abs(target - pred)
-        l1_loss = abs_diff
+        l1_loss = abs_diff.mean(1, True)
 
         if self.opt.no_ssim:
             reprojection_loss = l1_loss
         else:
-            ssim_loss = (self.ssim(pred, target)) / sigma + torch.log(sigma)
+            ssim_loss = (self.ssim(pred, target)).mean(1, True)
             reprojection_loss = 0.85 * ssim_loss + 0.15 * l1_loss
 
-            reprojection_loss = reprojection_loss / sigma + torch.log(sigma)
+            # Reference: https://github.com/no-Seaweed/Learning-Deep-Learning-1/blob/master/paper_notes/sfm_learner.md
+            # transformed_sigma = (10 * sigma + 0.1)
+            
+            # Exp 1 
+            # transformed_sigma = sigma + 0.001
+            # reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
 
-        reprojection_loss = reprojection_loss.mean(1, True)
+            reprojection_loss = (reprojection_loss * sigma)
 
         return reprojection_loss
 
-    def compute_losses(self, inputs, outputs):
+    def compute_losses(self, inputs, outputs, batch_idx=-1):
         """Compute the reprojection and smoothness losses for a minibatch
         """
         losses = {}
@@ -429,6 +440,10 @@ class Trainer:
                 a = outputs[("a", 0, frame_id)].unsqueeze(1)
                 b = outputs[("b", 0, frame_id)].unsqueeze(1)
                 target_frame = target * a + b
+                if batch_idx != -1:
+                    save_image(target_frame[-1], f'val_images/target_frame_{self.step}.jpeg')
+                    save_image(target[-1], f'val_images/target_{self.step}.jpeg')
+
                 reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame, sigma))
                 ab_losses.append((a - 1) ** 2 + b ** 2)
 
@@ -440,7 +455,10 @@ class Trainer:
                 identity_reprojection_losses = []
                 for frame_id in self.opt.frame_ids[1:]:
                     pred = inputs[("color", frame_id, source_scale)]
-                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target))
+                    a = outputs[("a", 0, frame_id)].unsqueeze(1)
+                    b = outputs[("b", 0, frame_id)].unsqueeze(1)
+                    target_frame = target * a + b
+                    identity_reprojection_losses.append(self.compute_reprojection_loss(pred, target_frame, sigma))
 
                 identity_reprojection_losses = torch.cat(identity_reprojection_losses, 1)
 
@@ -488,8 +506,13 @@ class Trainer:
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
             smooth_loss = get_smooth_loss(norm_disp, color)
-            reg_loss = smooth_loss + self.opt.ab_weight * ab_loss
+            
+            reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)
 
+            loss += torch.mean((sigma - 1) ** 2)
+            # categorical_loss = nn.CrossEntropyLoss()
+            # loss += categorical_loss(sigma, torch.ones_like(sigma))
+            # print(sigma.min(), sigma.max(), sigma.mean())
             loss += self.opt.disparity_smoothness * reg_loss / (2 ** scale)
 
             total_loss += loss
