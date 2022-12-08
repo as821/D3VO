@@ -19,8 +19,8 @@ from layers import disp_to_depth, transformation_from_parameters
 
 
 # Set heuristically
-MAX_DEPTH = 100
-MIN_DEPTH = 0.5
+MAX_DEPTH = 300
+MIN_DEPTH = 0.2
 
 
 class Networks():
@@ -99,7 +99,7 @@ class Networks():
         return depth_resized, sigma_resized
 
 
-    def pose(self, img1, img2, depth):
+    def pose(self, img1, img2, depth, translation_scale=45):
         """Pass provided image pair through PoseNet. Returns pose estimate (4x4 homogenous matrix) from img1 to img2."""
         # Resize images to fit the pose network
         assert img1.shape == img2.shape
@@ -109,6 +109,4 @@ class Networks():
         img2 = transforms.ToTensor()(img2.resize((self.w, self.h), pil.LANCZOS)).unsqueeze(0)
         with torch.no_grad():
             axisangle, translation, a, b = self.posenet(torch.cat((img1, img2), 1))
-
-        # TODO(as) depending on training settings, may have to pass invert=True here...
-        return transformation_from_parameters(axisangle[:, 0], translation[:, 0] * (1 / depth).mean()).cpu().numpy().squeeze(), a.numpy(), b.numpy()
+        return transformation_from_parameters(axisangle[:, 0], translation[:, 0] * (1 / depth).mean() * translation_scale).cpu().numpy().squeeze(), a.numpy(), b.numpy()
