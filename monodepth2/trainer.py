@@ -407,10 +407,10 @@ class Trainer:
             # transformed_sigma = (10 * sigma + 0.1)
             
             # Exp 1 
-            # transformed_sigma = sigma + 0.001
-            # reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
+            transformed_sigma = sigma + 1
+            reprojection_loss = (reprojection_loss / transformed_sigma) + torch.log(transformed_sigma)
 
-            reprojection_loss = (reprojection_loss * sigma)
+            # reprojection_loss = (reprojection_loss * sigma)
 
         return reprojection_loss
 
@@ -441,6 +441,7 @@ class Trainer:
                 b = outputs[("b", 0, frame_id)].unsqueeze(1)
                 target_frame = target * a + b
                 if batch_idx != -1:
+                    save_image(pred[-1], f'val_images/pred_{self.step}.jpeg')
                     save_image(target_frame[-1], f'val_images/target_frame_{self.step}.jpeg')
                     save_image(target[-1], f'val_images/target_{self.step}.jpeg')
 
@@ -509,7 +510,7 @@ class Trainer:
             
             reg_loss = smooth_loss + self.opt.ab_weight * torch.mean(ab_loss)
 
-            loss += torch.mean((sigma - 1) ** 2)
+            # loss += torch.mean((sigma - 1) ** 2)
             # categorical_loss = nn.CrossEntropyLoss()
             # loss += categorical_loss(sigma, torch.ones_like(sigma))
             # print(sigma.min(), sigma.max(), sigma.mean())
