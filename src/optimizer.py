@@ -7,7 +7,7 @@ from frontend import match_frame_kps
 
 class Map:
 	"""Maintains and optimizes over all frames, points, and keyframes."""
-	def __init__(self, alpha=0.5, num_kf=7, trajectory_scale=30):
+	def __init__(self, alpha=0.5, num_kf=7):
 		self.frames = []
 		self.points = []
 		self.keyframes = []
@@ -15,9 +15,6 @@ class Map:
 
 		# Maximum number of keyframes, manages size of optimization window
 		self.num_kf = num_kf
-
-		# Hyperparameter for translation scaling
-		self.trajectory_scale = trajectory_scale
 		
 		# Optimization hyperparameter for weighting uncertainty of a pixel (D3VO Eq. 13)
 		self.alpha = alpha
@@ -124,7 +121,8 @@ class Map:
 		# set up frames as vertices
 		for idx, f in enumerate(self.keyframes):
 			# add frame to the optimization graph as an SE(3) pose
-			v_se3 = g2o.VertexD3VOFramePose(f.image)
+			transform = (f.a * f.image + f.b).squeeze()
+			v_se3 = g2o.VertexD3VOFramePose(transform)
 			v_se3.set_estimate(g2o.SE3Quat(f.pose[0:3, 0:3], f.pose[0:3, 3]))
 			v_se3.set_id(f.id * 2)			# even IDs only (avoid ID conflict with points)
 
@@ -227,8 +225,5 @@ class Map:
 				pred_pose.append(np.dot(pred_pose[idx-1], np.linalg.inv(self.frames[idx].pose)))
 			else:
 				pred_pose.append(np.linalg.inv(f.pose))
-
-		for t in range(len(pred_pose)):
-			pred_pose[t][:3, 3] *= self.trajectory_scale
 		return pred_pose
 

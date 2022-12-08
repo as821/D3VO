@@ -14,11 +14,11 @@ DEBUG = False
 PER_FRAME_ERROR = True
 
 
-def offline_vo(cap, gt_path, save_path, out_dir):
+def offline_vo(cap, weights_path, gt_path, save_path, out_dir):
 	"""Run D3VO on offline video"""
 	intrinsic = np.array([[F,0,W//2,0],[0,F,H//2,0],[0,0,1,0]])
 
-	d3vo = D3VO(intrinsic)
+	d3vo = D3VO(weights_path, intrinsic)
 
 	if gt_path != "":
 		# Use open source KITTI evaluation code, requires poses in form of a dictionary
@@ -60,6 +60,7 @@ def offline_vo(cap, gt_path, save_path, out_dir):
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("path", type=str, help="path to the input video")
+	parser.add_argument("weights", type=str, help="path to directory containing trained DepthNet and PoseNet weights")
 	parser.add_argument("--gt", type=str, default="", help="path to .txt file with ground truth poses")
 	parser.add_argument("--save", type=str, default="poses.npy", help="path to output file to store pose predictions")
 	parser.add_argument("--out", type=str, help="path to output directory to store plots")
@@ -83,7 +84,7 @@ if __name__ == "__main__":
 	print("using camera %dx%d with F %f" % (W,H,F))
 
 	# run offline visual odometry on provided video
-	offline_vo(cap, args.gt, args.save, args.out)
+	offline_vo(cap, args.weights, args.gt, args.save, args.out)
 
 
 

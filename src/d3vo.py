@@ -4,30 +4,26 @@ from depth_pose_net import Networks
 import numpy as np
 
 class D3VO:
-	def __init__(self, intrinsic):
+	def __init__(self, weights_path, intrinsic):
 		self.intrinsic = intrinsic
 		self.mp = Map()
-		self.nn = Networks()
+		self.nn = Networks(weights_path)
 
 	def process_frame(self, frame, optimize=True):
 		"""Process a single frame with D3VO. Pass through DepthNet/PoseNet, frontend tracking, 
 		and backend optimization (if optimize == True)."""
-		# TODO run D3VO DepthNet and PoseNet (using Monodepth2 networks as placeholders)
-		uncertainty = np.zeros_like(frame)		# uncertainty == 0, get weight of 1. as uncertainty increases (positive or negative), weight drops
-		brightness_params = (0, 0)      		# a, b
-
 		# Run DepthNet to get depth map
-		depth = self.nn.depth(frame)
+		depth, uncertainty = self.nn.depth(frame)
 
 		if len(self.mp.frames) == 0:
 			# Set first frame pose to identity rotation and no translation. Uses homogenous 4x4 matrix
-			pose = np.eye(4)
+			pose, a, b = np.eye(4), 1, 0
 		else:
 			# Pass PoseNet the two most recent frames 
-			pose = self.nn.pose(self.mp.frames[-1].image, frame)
+			pose, a, b = self.nn.pose(self.mp.frames[-1].image, frame, depth=depth)
 
 		# Run frontend tracking
-		if not self.frontend(frame, depth, uncertainty, pose, brightness_params):
+		if not self.frontend(frame, depth, uncertainty, pose, (a, b)):
 			return
 
 		# Run backend optimization

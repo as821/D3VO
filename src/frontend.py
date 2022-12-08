@@ -79,7 +79,8 @@ class Frame:
 
 		self.depth = depth
 		self.uncertainty = uncertainty
-		self.brightness_params = brightness_params
+		self.a = brightness_params[0]
+		self.b = brightness_params[1]
 		self.pose = pose
 
 		self.marginalize = False
